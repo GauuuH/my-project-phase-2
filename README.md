@@ -46,6 +46,8 @@ DECIDER 游戏 Phase 2 基础网页原型（对应 `PLAN.md` 的 Day 2–3，提
    - Object：Pizza / Football
    - Tool：Umbrella / Hammer / Flashlight / Phone
    结果生成后保持显示，交互同时锁定（点 ⟳ Try again 解锁重试），暂不触发笔记本上的反馈。阈值在 `js/interactions.js` 顶部 `INTER_CONFIG`。
+5. 玩家完成自己 Role 的交互得到结果后，手机立即通过 MQTT 向房间发送 `player-result`（playerId / roleId / result），手机进入 **READY — result sent**，本轮不可重复提交（手动测试其他 Role 的交互只在本机显示，不会提交）。
+6. 笔记本收到结果后**只按 Role 秘密保存**（不显示具体选择、不触发任何环境/角色/道具反馈）；五个 Role Card 中已提交的显示 **● READY**，未提交的显示 WAITING/online；主状态显示 **X / 5 READY**（1–2 台手机也能正常测试）。
 
 > 联机要求：笔记本和手机都要能上网（消息经公共 MQTT 服务器中转）。房间码保存在本地，下次打开还会沿用同一个码。
 
