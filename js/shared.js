@@ -209,6 +209,9 @@ function createChannel(onMessage, room, onStatus) {
         console.warn("[DECIDER] not connected, message dropped: " + (msg && msg.type));
       }
     },
+    isConnected: function () {
+      return !!(client && client.connected);
+    },
     close: function () {
       closed = true;
       clearTimeout(switchTimer);

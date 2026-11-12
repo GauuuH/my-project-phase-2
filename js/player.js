@@ -145,6 +145,8 @@ function updateConnStatus(status) {
   connState = status;
   if (status === "connected") {
     setYouStatus("ok", "● Connected to room " + normalizeRoomCode(roomInput.value));
+    /* make sure the screen knows we are here as soon as we connect */
+    if (joined) announceJoin();
   } else if (status === "failed") {
     setYouStatus("err", "● Could not connect — check your internet");
   } else {
@@ -162,6 +164,9 @@ function getJoinedRoleId() {
  * Returns true when the room connection is up. */
 function sendPlayerResult(roleId, result) {
   if (!joined || !channel || connState !== "connected") return false;
+  /* re-announce the join first so the screen knows this player before
+   * the result arrives (MQTT keeps per-client message order) */
+  announceJoin();
   channel.send({
     type: "player-result",
     playerId: playerId,
