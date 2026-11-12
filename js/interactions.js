@@ -23,7 +23,13 @@
  */
 
 var INTER_CONFIG = {
-  blow:  { threshold: 0.015, holdMs: 150, releaseMs: 400 },
+  blow: {
+    calibrateMs: 700,   /* sample the environment noise this long at start */
+    noiseFactor: 2.5,   /* trigger = backgroundNoise * factor (must be clearly louder) */
+    minThreshold: 0.02, /* floor so quiet rooms are not too sensitive */
+    holdMs: 150,        /* blow must stay above the threshold ~150 ms */
+    releaseMs: 400,     /* quiet time before a new blow can re-trigger */
+  },
   shake: { threshold: 22, cooldownMs: 1200, calmMs: 8 },
   press: { holdMs: 1500 },
   tilt:  { triggerDeg: 32, resetDeg: 15, cooldownMs: 1000 },
@@ -43,7 +49,7 @@ var interSubmitted = false; /* own-role result was sent to the room */
 var lastResult = null;      /* { roleId, result } of the latest completion */
 
 /* per-detector state */
-var blowState = { stream: null, ctx: null, raf: null, aboveSince: 0, belowSince: 0, done: false };
+var blowState = { stream: null, ctx: null, raf: null, detector: null, sample: null };
 var shakeState = { handler: null, last: null, lastShake: 0, armed: true };
 var tiltState = { handler: null, lastTrigger: 0, armed: true };
 var pressState = { raf: null, done: false };
@@ -147,7 +153,7 @@ function resetInteraction() {
   interSetStatus("ready", "Ready");
   interResetBtn.hidden = true;
   lastResult = null;
-  blowState.done = false;
+  if (blowState.detector) blowState.detector.reset();
   shakeState.armed = true;
   tiltState.armed = true;
   pressState.done = false;
@@ -186,7 +192,8 @@ function stopAllInteractions() {
   blowState.stream = null;
   if (blowState.ctx) { try { blowState.ctx.close(); } catch (e) { /* ignore */ } }
   blowState.ctx = null;
-  blowState.aboveSince = 0; blowState.belowSince = 0; blowState.done = false;
+  blowState.detector = null;
+  blowState.sample = null;
 
   if (shakeState.handler) {
     window.removeEventListener("devicemotion", shakeState.handler);
@@ -229,7 +236,66 @@ function ensureMotionPermission(kind) {
   return Promise.resolve(true);
 }
 
-/* ---------- blow (microphone) ---------- */
+/* ---------- blow (microphone, adaptive noise threshold) ---------- */
+
+/* The adaptive detector is independent of the microphone so it can be
+ * driven by tests too. It first samples the environment for
+ * calibrateMs, computes backgroundNoise, and then the trigger is
+ * max(backgroundNoise * noiseFactor, minThreshold). A blow must stay
+ * clearly above that threshold for ~holdMs to complete. */
+function createBlowDetector(cfg, rmsEl, noiseEl, thrEl) {
+  var noiseSum = 0, noiseCount = 0;
+  var calibrateSamples = Math.max(5, Math.round(cfg.calibrateMs / 16));
+  var holdSamples = Math.max(2, Math.round(cfg.holdMs / 16));
+  var releaseSamples = Math.max(4, Math.round(cfg.releaseMs / 16));
+  var backgroundNoise = 0;
+  var dynamicThreshold = cfg.minThreshold;
+  var calibrated = false;
+  var aboveSince = 0, belowSince = 0, done = false;
+
+  function sample(rms) {
+    rmsEl.textContent = rms.toFixed(3);
+
+    if (!calibrated) {
+      noiseSum += rms;
+      noiseCount++;
+      noiseEl.textContent = "…";
+      thrEl.textContent = "…";
+      if (noiseCount >= calibrateSamples) {
+        backgroundNoise = noiseSum / Math.max(noiseCount, 1);
+        dynamicThreshold = Math.max(backgroundNoise * cfg.noiseFactor, cfg.minThreshold);
+        calibrated = true;
+        noiseEl.textContent = backgroundNoise.toFixed(3);
+        thrEl.textContent = dynamicThreshold.toFixed(3);
+        if (interCurrent === "blow" && !interLocked) {
+          interSetStatus("ready", "Ready — blow into the microphone");
+        }
+      }
+      return;
+    }
+
+    if (rms > dynamicThreshold && !interLocked) {
+      aboveSince++;
+      belowSince = 0;
+      if (aboveSince >= holdSamples && !done) {
+        done = true;
+        interComplete();
+      }
+    } else {
+      belowSince++;
+      aboveSince = 0;
+      if (belowSince > releaseSamples) done = false;
+    }
+  }
+
+  return {
+    sample: sample,
+    isCalibrated: function () { return calibrated; },
+    getNoise: function () { return backgroundNoise; },
+    getThreshold: function () { return dynamicThreshold; },
+    reset: function () { aboveSince = 0; belowSince = 0; done = false; },
+  };
+}
 
 function armBlow() {
   var AC = window.AudioContext || window.webkitAudioContext;
@@ -241,10 +307,23 @@ function armBlow() {
 
   interStage.innerHTML =
     '<p class="inter-hint">Blow into the microphone</p>' +
-    '<div class="blow-meter"><div class="blow-fill" id="blowFill"></div></div>';
+    '<div class="blow-meter"><div class="blow-fill" id="blowFill"></div></div>' +
+    '<div class="blow-stats">' +
+    '<span>RMS <b id="blowRms">0.000</b></span>' +
+    '<span>noise <b id="blowNoise">—</b></span>' +
+    '<span>threshold <b id="blowThreshold">—</b></span>' +
+    '</div>';
   var fill = document.getElementById("blowFill");
+  var rmsEl = document.getElementById("blowRms");
+  var noiseEl = document.getElementById("blowNoise");
+  var thrEl = document.getElementById("blowThreshold");
 
   interSetStatus("active", "Requesting microphone…");
+
+  /* the adaptive detector runs independently of the microphone */
+  var cfg = INTER_CONFIG.blow;
+  blowState.detector = createBlowDetector(cfg, rmsEl, noiseEl, thrEl);
+  blowState.sample = function (rms) { blowState.detector.sample(rms); };
 
   navigator.mediaDevices.getUserMedia({ audio: true }).then(function (stream) {
     blowState.stream = stream;
@@ -254,10 +333,8 @@ function armBlow() {
     analyser.fftSize = 512;
     src.connect(analyser);
     var buf = new Float32Array(analyser.fftSize);
-    blowState.aboveSince = 0;
-    blowState.belowSince = 0;
-    blowState.done = false;
-    interSetStatus("ready", "Ready — blow into the microphone");
+
+    interSetStatus("active", "Calibrating noise…");
 
     function loop() {
       if (interCurrent !== "blow") return;
@@ -267,26 +344,20 @@ function armBlow() {
       rms = Math.sqrt(rms / buf.length);
 
       fill.style.height = Math.min(100, rms * 400) + "%";
-
-      var cfg = INTER_CONFIG.blow;
-      if (rms > cfg.threshold && !interLocked) {
-        blowState.aboveSince += 16;
-        blowState.belowSince = 0;
-        if (blowState.aboveSince >= cfg.holdMs && !blowState.done) {
-          blowState.done = true;
-          interComplete();
-        }
-      } else {
-        blowState.belowSince += 16;
-        blowState.aboveSince = 0;
-        if (blowState.belowSince > cfg.releaseMs) blowState.done = false;
-      }
+      if (blowState.sample) blowState.sample(rms);
       blowState.raf = requestAnimationFrame(loop);
     }
     blowState.raf = requestAnimationFrame(loop);
   }).catch(function () {
-    if (!interLocked) interSetStatus("error", "Microphone permission denied");
+    if (!interLocked && blowState.detector && !blowState.detector.isCalibrated()) {
+      interSetStatus("error", "Microphone permission denied");
+    }
   });
+}
+
+/* dev/test helper: feed a synthetic RMS sample into the blow detector */
+function debugBlowSample(rms) {
+  if (blowState.sample) blowState.sample(rms);
 }
 
 /* ---------- shake (DeviceMotion) ---------- */

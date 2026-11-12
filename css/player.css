@@ -267,6 +267,22 @@ input:focus {
   transition: height 60ms linear;
 }
 
+/* live RMS / noise / threshold readout */
+.blow-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.blow-stats b {
+  color: var(--text);
+  font-family: Consolas, "Courier New", monospace;
+  font-weight: 400;
+  margin-left: 6px;
+}
+
 /* press & hold pad */
 .press-pad {
   position: relative;
