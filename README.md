@@ -48,6 +48,11 @@ DECIDER 游戏 Phase 2 基础网页原型（对应 `PLAN.md` 的 Day 2–3，提
    结果生成后保持显示，交互同时锁定（点 ⟳ Try again 解锁重试），暂不触发笔记本上的反馈。阈值在 `js/interactions.js` 顶部 `INTER_CONFIG`。
 5. 玩家完成自己 Role 的交互得到结果后，手机立即通过 MQTT 向房间发送 `player-result`（playerId / roleId / result），手机进入 **READY — result sent**，本轮不可重复提交（手动测试其他 Role 的交互只在本机显示，不会提交）。
 6. 笔记本收到结果后**只按 Role 秘密保存**（不显示具体选择、不触发任何环境/角色/道具反馈）；五个 Role Card 中已提交的显示 **● READY**，未提交的显示 WAITING/online；主状态显示 **X / 5 READY**（1–2 台手机也能正常测试）。
+7. **Combine & Command Reveal**：当五个 Role 的结果全部收到（`state.results.size === 5`）时，主屏幕一次性读取五个结果并 Reveal 完整 Command，例如：
+   - `Rain · Run · Eat · Pizza · Umbrella`
+   - `Run in the rain while eating pizza with an umbrella.`
+   5/5 之前只显示 READY 计数，绝不泄露具体结果，也不触发角色/环境/道具。目前 Reveal 只显示文字，不执行动画、不切换环境。
+   - **DEV: Fill Missing Roles** 按钮（右侧 DEV 面板）：只为尚未 READY 的 Role 随机补测试结果（真实手机提交的结果不会被覆盖），补足 5/5 后走同一套 Combine → Reveal 流程。仅开发测试用。
 
 > 联机要求：笔记本和手机都要能上网（消息经公共 MQTT 服务器中转）。房间码保存在本地，下次打开还会沿用同一个码。
 
