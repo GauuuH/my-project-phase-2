@@ -73,12 +73,13 @@ body {
 
 /* ---------- game area ---------- */
 
+/* The box matches the map's own 16:9 aspect ratio, so the background
+ * fills the whole game area without stretching. */
 .world {
   position: relative;
-  display: grid;
-  place-items: center;
-  width: min(72vw, 480px);
-  height: min(50vh, 480px);
+  height: min(52vh, 560px);
+  aspect-ratio: 16 / 9;
+  width: auto;
   border: 1px solid var(--line);
   border-radius: 18px;
   background: rgba(13, 19, 33, 0.5);
@@ -93,19 +94,145 @@ body {
   letter-spacing: 3px;
   color: var(--muted);
   opacity: 0.8;
+  z-index: 5;
 }
 
-/* The character is drawn into this one fixed box. Every idle frame
- * uses the exact same box, so the character never changes size or
- * position while animating. object-fit: contain keeps the original
- * aspect ratio and never stretches the image. */
-.character {
+/* ---------- layers (z-order): map < light/weather fx < character ---------- */
+
+.map-background {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
-  object-fit: contain;
-  display: block;
+  object-fit: contain; /* box aspect = map aspect, so it fills exactly */
   pointer-events: none;
   user-select: none;
+}
+
+/* Character: independent layer standing above the map.
+ *   --char-height:  character height as % of game area height.
+ *   --char-floor-y: where the feet touch the floor (% of map height).
+ * The feet sit at 89.7% of the sprite height (732/816), so the sprite's
+ * top is: floor-y - height * 0.897. Tune the two variables to adjust. */
+.character {
+  --char-height: 28%;
+  --char-floor-y: 68%;
+  position: absolute;
+  left: 50%;
+  top: calc(var(--char-floor-y) - var(--char-height) * 0.897);
+  height: var(--char-height);
+  width: auto; /* keep the sprite's own aspect ratio, no stretching */
+  transform: translateX(-50%);
+  z-index: 3;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* ---------- environment: sunny ---------- */
+
+.sun-overlay {
+  position: absolute;
+  inset: 0;
+  display: none;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 22% 14% at 50.5% 23%, rgba(255, 250, 220, 0.28), transparent 70%),
+    linear-gradient(180deg, rgba(255, 240, 200, 0.07), transparent 55%);
+}
+
+.env-sunny .sun-overlay {
+  display: block;
+}
+
+.env-sunny .map-background {
+  filter: brightness(1.05) saturate(1.03);
+}
+
+/* ---------- environment: rain / snow (inside the big window only) ---------- */
+
+/* The window box is the sky area of the map: x 34.1-67.1%, y 7.8-38.2%. */
+.window-fx {
+  position: absolute;
+  left: 34%;
+  top: 7.8%;
+  width: 33%;
+  height: 30.4%;
+  overflow: hidden; /* rain and snow never fall into the room */
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* slightly darken the outside view while it rains */
+.window-dim {
+  position: absolute;
+  inset: 0;
+  display: none;
+  background: rgba(28, 38, 68, 0.38);
+}
+
+.env-rain .window-dim {
+  display: block;
+}
+
+.fx-drop {
+  position: absolute;
+  top: -30px;
+  width: 2px;
+  background: linear-gradient(to bottom, rgba(180, 210, 255, 0), rgba(195, 225, 255, 0.85));
+  animation: drop-fall linear infinite;
+}
+
+@keyframes drop-fall {
+  to { transform: translateY(420px); }
+}
+
+.fx-flake {
+  position: absolute;
+  top: -12px;
+  border-radius: 50%;
+  background: #ffffff;
+  animation: flake-fall linear infinite;
+}
+
+@keyframes flake-fall {
+  0% { transform: translate(0, 0); }
+  20% { transform: translate(9px, 84px); }
+  40% { transform: translate(-7px, 168px); }
+  60% { transform: translate(10px, 252px); }
+  80% { transform: translate(-8px, 336px); }
+  100% { transform: translate(5px, 420px); }
+}
+
+/* ---------- environment test panel ---------- */
+
+.env-panel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 18px;
+  padding: 4px 10px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+}
+
+.env-panel-label {
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: var(--muted);
+  margin-right: 4px;
+}
+
+.env-btn {
+  font-size: 12px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  background: transparent;
+}
+
+.env-btn.active {
+  border-color: var(--accent);
+  background: var(--panel-2);
+  color: var(--accent);
 }
 
 /* action effects on the game area (shake and tilt shake the whole

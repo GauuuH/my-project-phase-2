@@ -10,6 +10,14 @@ DECIDER 游戏 Phase 2 基础网页原型（对应 `PLAN.md` 的 Day 2–3，提
 | Shared Main Screen | `screen/index.html` | 笔记本上显示的共享主屏幕（生成房间码） |
 | 手机玩家页 | `player/index.html` | 真手机/平板：输入房间码、选角色、发动作 |
 
+## 当前视觉效果
+
+- **背景**：`assets/room/Map.png`（像素风室内房间）铺满 Game Area，保持 16:9 原比例。
+- **角色**：独立图层站在房间中央木地板上（Idle 动画循环播放）。位置/大小可在 `css/screen.css` 的 `.character` 里调 `--char-height`（高度）和 `--char-floor-y`（脚底位置）。
+- **Environment Test Panel**：顶栏三个按钮 ☀️ Sunny / 🌧️ Rain / ❄️ Snow，同一时间只有一种环境。
+  - Sunny：地图本身的晴天 + 轻微暖光。
+  - Rain / Snow：`js/environment.js` 代码生成的雨滴/雪花，只出现在背景大窗户区域内，窗外会稍微变暗，不会落到室内。数量、大小、速度在文件顶部 `ENV_CONFIG` 里调。
+
 ## 如何运行（联机版）
 
 1. 笔记本用 Chrome/Edge 打开 `screen/index.html`（本地双击，或 Pages 上的链接均可）。
@@ -33,16 +41,18 @@ DECIDER 游戏 Phase 2 基础网页原型（对应 `PLAN.md` 的 Day 2–3，提
 ├── screen/index.html         Shared Main Screen（笔记本）
 ├── player/index.html         手机玩家页
 ├── assets/idle/frames/       Idle 动画帧（008.png / 009.png）
+├── assets/room/Map.png       房间背景（16:9 像素画）
 ├── css/
 │   ├── base.css              共享基础样式
-│   ├── screen.css            主屏幕样式
+│   ├── screen.css            主屏幕样式（含角色定位、天气效果）
 │   └── player.css            玩家页样式
 └── js/
     ├── vendor/mqtt.min.js    MQTT 客户端库（本地）
     ├── shared.js             共享数据 + 房间码 + MQTT 通信层
     ├── screen.js             主屏幕逻辑
     ├── player.js             玩家页逻辑
-    └── idle.js               角色 Idle 动画（速度参数在顶部 IDLE_CONFIG）
+    ├── idle.js               角色 Idle 动画（速度参数在顶部 IDLE_CONFIG）
+    └── environment.js        Sunny/Rain/Snow 环境系统（参数在顶部 ENV_CONFIG）
 ```
 
 ## GitHub Pages

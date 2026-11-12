@@ -16,11 +16,22 @@
       <span id="connText">Connecting…</span>
     </div>
     <div class="room-code">Room: <b id="roomCode">…</b></div>
+    <div class="env-panel">
+      <span class="env-panel-label">ENV TEST</span>
+      <button class="env-btn active" data-env="sunny">☀️ Sunny</button>
+      <button class="env-btn" data-env="rain">🌧️ Rain</button>
+      <button class="env-btn" data-env="snow">❄️ Snow</button>
+    </div>
   </header>
 
   <main class="stage-wrap">
-    <div id="world" class="world game-area">
+    <div id="world" class="world game-area env-sunny">
       <span class="game-area-label">GAME AREA</span>
+      <img id="mapBackground" class="map-background" src="../assets/room/Map.png" alt="Room background">
+      <div class="sun-overlay" aria-hidden="true"></div>
+      <div class="window-fx" id="windowFx" aria-hidden="true">
+        <div class="window-dim"></div>
+      </div>
       <img id="character" class="character" alt="Character idle animation">
     </div>
 
@@ -41,5 +52,6 @@
   <script src="../js/shared.js"></script>
   <script src="../js/screen.js"></script>
   <script src="../js/idle.js"></script>
+  <script src="../js/environment.js"></script>
 </body>
 </html>
