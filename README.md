@@ -31,13 +31,15 @@ DECIDER 游戏 Phase 2 基础网页原型（对应 `PLAN.md` 的 Day 2–3，提
 1. 笔记本用 Chrome/Edge 打开 `screen/index.html`（本地双击，或 Pages 上的链接均可）。
 2. 记住主屏幕右上角的 **4 位房间码**（如 `KX7P`）。
 3. 手机上打开玩家页 `player/index.html`：输入房间码 → 选角色 → 输入名字 → **Join the game**。
-4. 加入后可在同一台手机上逐个选择并测试五种真实交互（`js/interactions.js`，阈值在顶部 `INTER_CONFIG`）：
-   - 💨 **Blow**：对着麦克风吹气（Web Audio）
-   - 📳 **Shake**：真实摇晃手机（DeviceMotion）
-   - 👆 **Press & Hold**：按住屏幕约 1.5 秒
-   - 📐 **Tilt**：倾斜手机（DeviceOrientation）
-   - 👋 **Swipe**：向任意方向快速滑动
-   检测成功后手机端只显示结果和 Completed/Ready 状态，暂不触发笔记本上的反馈。
+4. 加入后**自动启动该角色绑定的交互**（`js/shared.js` 里 `DECIDER.ROLE_INTERACTION`，开发绑定）：
+   | Role | Interaction |
+   | --- | --- |
+   | 🌍 Environment | 💨 Blow（麦克风吹气） |
+   | 🧭 Movement | 📳 Shake（DeviceMotion 摇晃） |
+   | ⚡ Action | 👆 Press & Hold（按住约 1.5 秒） |
+   | 📦 Object | 📐 Tilt（DeviceOrientation 倾斜） |
+   | 🔧 Tool | 👋 Swipe（快速滑动） |
+   页面下方保留 **Manual test (dev)** 五个按钮，可手动切换测试。检测成功后手机端只显示结果和 Completed/Ready 状态，暂不触发笔记本上的反馈。阈值在 `js/interactions.js` 顶部 `INTER_CONFIG`。
 
 > 联机要求：笔记本和手机都要能上网（消息经公共 MQTT 服务器中转）。房间码保存在本地，下次打开还会沿用同一个码。
 
