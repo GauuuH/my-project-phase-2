@@ -1,0 +1,53 @@
+/* DECIDER - shared base styles */
+
+:root {
+  --bg: #0a0e17;
+  --bg-2: #101725;
+  --panel: #151d30;
+  --panel-2: #1a2440;
+  --line: #26304d;
+  --text: #eaf0fb;
+  --muted: #8fa0bf;
+  --accent: #38e1ff;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: radial-gradient(1200px 600px at 50% -100px, #16233f 0%, var(--bg) 60%);
+  color: var(--text);
+  font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  border-radius: 10px;
+  transition: transform 0.06s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+button:hover {
+  border-color: var(--accent);
+}
+
+button:active {
+  transform: scale(0.96);
+}
+
+button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

@@ -1,0 +1,172 @@
+/* DECIDER - phone player page styles */
+
+body {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  padding: 16px;
+}
+
+.phone {
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+h1 {
+  letter-spacing: 8px;
+  color: var(--accent);
+  text-align: center;
+  text-shadow: 0 0 18px rgba(56, 225, 255, 0.5);
+}
+
+.sub {
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+  margin-top: -10px;
+}
+
+section {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+h2 {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+/* ---------- role picker ---------- */
+
+.role-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.role-btn {
+  padding: 12px 8px;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.role-btn .icon {
+  font-size: 24px;
+}
+
+.role-btn .ctrl {
+  font-size: 10px;
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.role-btn.selected {
+  border-color: var(--role-color);
+  box-shadow: 0 0 14px -4px var(--role-color);
+  background: var(--panel-2);
+}
+
+/* ---------- name input ---------- */
+
+input {
+  font: inherit;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--bg-2);
+  color: var(--text);
+  outline: none;
+}
+
+input:focus {
+  border-color: var(--accent);
+}
+
+.join-btn {
+  padding: 14px;
+  font-weight: 700;
+  background: var(--accent);
+  color: #06222b;
+  border: none;
+}
+
+.hint {
+  font-size: 11px;
+  color: var(--muted);
+  text-align: center;
+}
+
+/* ---------- joined view ---------- */
+
+.you {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--bg-2);
+  border-radius: 10px;
+}
+
+.you-icon {
+  font-size: 26px;
+}
+
+.you-info {
+  min-width: 0;
+}
+
+.you-info small {
+  display: block;
+  color: var(--muted);
+}
+
+.leave-btn {
+  margin-left: auto;
+  font-size: 11px;
+  padding: 6px 10px;
+  color: #f87171;
+  border-color: #7f1d1d;
+}
+
+.action-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.action-btn {
+  padding: 18px 8px;
+  font-size: 15px;
+  font-weight: 600;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+}
+
+.action-btn .icon {
+  font-size: 26px;
+}
+
+.last-action {
+  font-size: 12px;
+  color: var(--accent);
+  text-align: center;
+  min-height: 1.2em;
+}

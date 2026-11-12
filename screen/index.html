@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DECIDER · Shared Main Screen</title>
+  <link rel="stylesheet" href="../css/base.css">
+  <link rel="stylesheet" href="../css/screen.css">
+</head>
+<body>
+
+  <header class="topbar">
+    <h1>DECIDER</h1>
+    <div class="room">
+      <span class="dot"></span>
+      <span>Shared Main Screen</span>
+    </div>
+    <div class="room-code">Room: <b>LOCAL</b></div>
+  </header>
+
+  <main class="stage-wrap">
+    <div id="world" class="world game-area">
+      <span class="game-area-label">GAME AREA</span>
+      <img id="character" class="character" alt="Character idle animation">
+    </div>
+
+    <div class="result">
+      <div id="resultText" class="result-text">Waiting for players…</div>
+      <div id="resultSub" class="result-sub"></div>
+    </div>
+
+    <div class="event-log">
+      <span class="event-log-label">LOG</span>
+      <span id="eventLogText" class="event-log-text">—</span>
+    </div>
+  </main>
+
+  <footer class="players" id="players"></footer>
+
+  <script src="../js/shared.js"></script>
+  <script src="../js/screen.js"></script>
+  <script src="../js/idle.js"></script>
+</body>
+</html>

@@ -1,0 +1,233 @@
+/* DECIDER - Shared Main Screen (laptop) styles */
+
+body {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ---------- top bar ---------- */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 24px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(16, 23, 37, 0.6);
+}
+
+.topbar h1 {
+  font-size: 20px;
+  letter-spacing: 6px;
+  color: var(--accent);
+  text-shadow: 0 0 18px rgba(56, 225, 255, 0.5);
+}
+
+.room {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.room .dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #3ddc84;
+  box-shadow: 0 0 10px #3ddc84;
+}
+
+.room-code {
+  margin-left: auto;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.room-code b {
+  color: var(--text);
+}
+
+/* ---------- stage ---------- */
+
+.stage-wrap {
+  position: relative;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 16px;
+  padding: 20px 24px;
+}
+
+/* ---------- game area ---------- */
+
+.world {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: min(72vw, 480px);
+  height: min(50vh, 480px);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: rgba(13, 19, 33, 0.5);
+  overflow: hidden;
+}
+
+.game-area-label {
+  position: absolute;
+  top: 10px;
+  left: 14px;
+  font-size: 10px;
+  letter-spacing: 3px;
+  color: var(--muted);
+  opacity: 0.8;
+}
+
+/* The character is drawn into this one fixed box. Every idle frame
+ * uses the exact same box, so the character never changes size or
+ * position while animating. object-fit: contain keeps the original
+ * aspect ratio and never stretches the image. */
+.character {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* action effects on the game area (shake and tilt shake the whole
+ * area, including the character) */
+
+.world.fx-shake {
+  animation: shake 0.5s ease;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translate(0, 0); }
+  20% { transform: translate(-10px, 4px) rotate(-2deg); }
+  40% { transform: translate(10px, -6px) rotate(2deg); }
+  60% { transform: translate(-8px, 6px); }
+  80% { transform: translate(8px, -4px); }
+}
+
+.world.fx-tilt {
+  animation: tilt 1s ease;
+}
+
+@keyframes tilt {
+  0%, 100% { transform: rotate(0); }
+  30% { transform: rotate(-9deg); }
+  60% { transform: rotate(6deg); }
+}
+
+/* ---------- result text ---------- */
+
+.result {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.result-text {
+  font-size: 24px;
+  font-weight: 600;
+  min-height: 1.4em;
+  text-shadow: 0 0 24px rgba(56, 225, 255, 0.25);
+}
+
+.result-sub {
+  font-size: 13px;
+  color: var(--muted);
+  min-height: 1.2em;
+}
+
+/* ---------- event log ---------- */
+
+.event-log {
+  position: absolute;
+  bottom: 10px;
+  left: 24px;
+  right: 24px;
+  display: flex;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.event-log-label {
+  color: var(--accent);
+  font-weight: 700;
+  letter-spacing: 2px;
+}
+
+.event-log-text {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* ---------- player cards ---------- */
+
+.players {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+  padding: 12px 20px 18px;
+  border-top: 1px solid var(--line);
+  background: rgba(16, 23, 37, 0.6);
+}
+
+.player-card {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+  padding: 12px 14px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+}
+
+.player-card.joined {
+  border-color: var(--role-color);
+  box-shadow: 0 0 18px -6px var(--role-color);
+}
+
+.player-card.offline {
+  opacity: 0.45;
+}
+
+.player-icon {
+  font-size: 26px;
+}
+
+.player-info {
+  min-width: 0;
+}
+
+.player-role {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.player-name {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.player-status {
+  margin-left: auto;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.status-joined { color: #3ddc84; }
+.status-offline { color: #f87171; }
+.status-empty { color: var(--muted); }

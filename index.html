@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DECIDER</title>
+  <link rel="stylesheet" href="css/base.css">
+  <style>
+    body {
+      display: grid;
+      place-items: center;
+      min-height: 100vh;
+      padding: 16px;
+    }
+
+    .hub {
+      width: 100%;
+      max-width: 460px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    h1 {
+      letter-spacing: 10px;
+      color: var(--accent);
+      text-shadow: 0 0 22px rgba(56, 225, 255, 0.5);
+      font-size: 34px;
+    }
+
+    .tagline {
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 10px;
+    }
+
+    .link-card {
+      display: block;
+      text-decoration: none;
+      color: var(--text);
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 22px;
+      font-weight: 700;
+      font-size: 17px;
+      transition: border-color 0.15s ease, transform 0.08s ease, box-shadow 0.15s ease;
+    }
+
+    .link-card:hover {
+      border-color: var(--accent);
+      box-shadow: 0 0 24px -8px var(--accent);
+      transform: translateY(-2px);
+    }
+
+    .link-card .big {
+      display: block;
+      font-size: 30px;
+      margin-bottom: 6px;
+    }
+
+    .link-card small {
+      display: block;
+      color: var(--muted);
+      font-weight: 400;
+      font-size: 12px;
+    }
+
+    .note {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+
+  <main class="hub">
+    <h1>DECIDER</h1>
+    <p class="tagline">Phase 2 — basic shared game prototype</p>
+
+    <a class="link-card" href="screen/index.html">
+      <span class="big">🖥️</span>
+      Open Shared Main Screen
+      <small>for the laptop</small>
+    </a>
+
+    <a class="link-card" href="player/index.html">
+      <span class="big">📱</span>
+      Open Player Page
+      <small>for a phone (or a second tab)</small>
+    </a>
+
+    <p class="note">
+      Open the Shared Main Screen in one tab, then open one Player Page per “phone”
+      in other tabs of the same browser. Pick a role, join, and use Blow / Shake /
+      Press / Tilt — the screen updates live.
+    </p>
+  </main>
+
+</body>
+</html>

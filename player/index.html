@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DECIDER · Player</title>
+  <link rel="stylesheet" href="../css/base.css">
+  <link rel="stylesheet" href="../css/player.css">
+</head>
+<body>
+
+  <main class="phone">
+    <h1>DECIDER</h1>
+    <p class="sub">Phone player</p>
+
+    <section class="join" id="joinSection">
+      <h2>1 · Choose your role</h2>
+      <div class="role-grid" id="roleGrid"></div>
+
+      <h2>2 · Your name</h2>
+      <input id="nameInput" placeholder="e.g. Alex" maxlength="12" autocomplete="off">
+
+      <button class="join-btn" id="joinBtn" disabled>Join the game</button>
+      <p class="hint">Open the Shared Main Screen in another tab on the laptop.</p>
+    </section>
+
+    <section class="actions" id="actionSection" hidden>
+      <div class="you">
+        <span class="you-icon" id="youIcon"></span>
+        <div class="you-info">
+          <b id="youName"></b>
+          <small id="youRole"></small>
+        </div>
+        <button class="leave-btn" id="leaveBtn">Leave</button>
+      </div>
+
+      <h2>Your actions</h2>
+      <div class="action-grid" id="actionGrid"></div>
+      <p class="last-action" id="lastAction"></p>
+    </section>
+  </main>
+
+  <script src="../js/shared.js"></script>
+  <script src="../js/player.js"></script>
+</body>
+</html>
