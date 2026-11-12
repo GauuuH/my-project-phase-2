@@ -34,7 +34,7 @@ DECIDER 游戏 Phase 2 基础网页原型（对应 `PLAN.md` 的 Day 2–3，提
 4. 加入后**自动启动该角色绑定的交互**（`js/shared.js` 里 `DECIDER.ROLE_INTERACTION`，开发绑定）：
    | Role | Interaction |
    | --- | --- |
-   | 🌍 Environment | 💨 Blow（麦克风吹气） |
+   | 🌍 Environment | 💨 Blow（麦克风吹气，**自适应噪声阈值**：启动先采样环境噪声 ~700ms，触发阈值 = max(噪声 × 2.5, 0.02)，吹气需明显高于阈值并持续 ~150ms；界面上实时显示 RMS / noise / threshold 便于调试） |
    | 🧭 Movement | 📳 Shake（DeviceMotion 摇晃） |
    | ⚡ Action | 👆 Press & Hold（按住约 1.5 秒） |
    | 📦 Object | 📐 Tilt（DeviceOrientation 倾斜） |
