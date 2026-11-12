@@ -10,16 +10,18 @@
  *   - The interaction is only the input method.
  *   - A successful interaction randomly generates one game result
  *     from the bound role's pool (see DECIDER.ROLE_RESULTS):
- *       Environment/Blow  -> Sunny | Rain | Snow
- *       Action/Shake      -> Walk | Run | Jump | Fall | Eat
- *       Object/Tilt       -> Pizza | Football
- *       Tool/Swipe        -> Umbrella | Hammer | Flashlight | Phone
+ *       Environment/Blow   -> Sunny | Rain | Snow
+ *       Action/Shake       -> Walk | Run | Jump | Fall | Eat
+ *       Item/Tilt          -> Pizza | Football | Umbrella | Hammer |
+ *                             Flashlight | Phone
+ *       Direction/Swipe    -> Left | Right | Up | Down
+ *   - Direction is special: the result IS the real swipe direction
+ *     (the swipe detector passes it in), never a random draw.
  *   - Press & Hold has no role bound to it, so it generates no game
  *     result and takes no part in the round - it only confirms the
  *     detection on the phone.
  *   - The result stays on screen and the interaction locks until the
  *     player presses "Try again" (so one action can't spam results).
- *   - Nothing is sent to the laptop yet.
  *
  * All thresholds are in INTER_CONFIG below - easy to tune.
  */
@@ -86,14 +88,15 @@ function randomResult(roleId) {
 }
 
 /* Called by every detector when its interaction is detected.
- * Generates a random game result for the bound role and shows it.
- * If the interaction belongs to the player's own joined role, the
- * result is sent to the room once (player-result message) and the
- * phone goes READY - no resubmission this round. Manual tests of
- * other roles' interactions only show the result on the phone.
+ * Generates a game result for the bound role and shows it - either
+ * the real swipe direction (Direction role) or a random draw from the
+ * role's pool. If the interaction belongs to the player's own joined
+ * role, the result is sent to the room once (player-result message)
+ * and the phone goes READY - no resubmission this round. Manual tests
+ * of other roles' interactions only show the result on the phone.
  * Interactions without a role (Press & Hold, dev/test only) just
  * confirm the detection - no result, nothing sent. */
-function interComplete() {
+function interComplete(resultOverride) {
   if (interLocked || !interCurrent) return;
 
   var roleId = roleForInteraction(interCurrent);
@@ -115,7 +118,9 @@ function interComplete() {
     return;
   }
 
-  var result = randomResult(roleId);
+  var result = (resultOverride !== undefined && resultOverride !== null)
+    ? resultOverride
+    : randomResult(roleId);
   lastResult = { roleId: roleId, result: result };
 
   interSetResult(
@@ -475,7 +480,12 @@ function armSwipe() {
 
     if (!interLocked &&
         Math.max(Math.abs(dx), Math.abs(dy)) >= cfg.minDistance && dt <= cfg.maxDuration) {
-      interComplete();
+      /* the real swipe direction is the Direction result:
+       * dominant axis first, then the sign of that axis */
+      var dir = null;
+      if (Math.abs(dx) >= Math.abs(dy)) dir = dx < 0 ? "Left" : "Right";
+      else dir = dy < 0 ? "Up" : "Down";
+      interComplete(dir);
     } else if (!interLocked) {
       interSetStatus("ready", "Ready");
     }

@@ -28,14 +28,14 @@ var DECIDER = {
   PLAYER_ID_KEY: "decider-player-id",
 
   /* Four player roles. Each role controls one part of the world:
-   * Environment, Action, Object, Tool.
-   * (The old Movement role was merged into Action: Action now also
-   * covers Walk / Run / Jump / Fall next to Eat.) */
+   * Environment, Action, Item, Direction.
+   * (Object and Tool were merged into Item; the old Movement role is
+   * covered by Action + Direction.) */
   ROLES: [
     { id: "environment", name: "Environment", controller: "The Architect", icon: "🌍", color: "#2dd4bf" },
     { id: "action",      name: "Action",      controller: "The Operator",  icon: "⚡", color: "#fbbf24" },
-    { id: "object",      name: "Object",      controller: "The Collector", icon: "📦", color: "#60a5fa" },
-    { id: "tool",        name: "Tool",        controller: "The Engineer",  icon: "🔧", color: "#a78bfa" },
+    { id: "item",        name: "Item",        controller: "The Collector", icon: "📦", color: "#60a5fa" },
+    { id: "direction",   name: "Direction",   controller: "The Navigator", icon: "🧭", color: "#f472b6" },
   ],
 
   /* Physical interactions. Press & Hold is kept as a dev/test
@@ -50,22 +50,23 @@ var DECIDER = {
   ],
 
   /* Role -> real phone interaction binding:
-   * Environment = Blow, Action = Shake, Object = Tilt, Tool = Swipe. */
+   * Environment = Blow, Action = Shake, Item = Tilt, Direction = Swipe. */
   ROLE_INTERACTION: {
     environment: "blow",
     action: "shake",
-    object: "tilt",
-    tool: "swipe",
+    item: "tilt",
+    direction: "swipe",
   },
 
-  /* Random game result pool for each role. The interaction is
-   * only the input: e.g. a successful Blow randomly gives Sunny,
-   * Rain or Snow. */
+  /* Result pool for each role. The interaction is only the input:
+   * e.g. a successful Blow randomly gives Sunny, Rain or Snow. The
+   * Direction pool is used by DEV Fill / random fallbacks only - a
+   * real phone Swipe produces the real swipe direction instead. */
   ROLE_RESULTS: {
     environment: ["Sunny", "Rain", "Snow"],
     action: ["Walk", "Run", "Jump", "Fall", "Eat"],
-    object: ["Pizza", "Football"],
-    tool: ["Umbrella", "Hammer", "Flashlight", "Phone"],
+    item: ["Pizza", "Football", "Umbrella", "Hammer", "Flashlight", "Phone"],
+    direction: ["Left", "Right", "Up", "Down"],
   },
 };
 

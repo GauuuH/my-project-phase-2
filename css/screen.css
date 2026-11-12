@@ -140,9 +140,11 @@ body {
 
 /* ---------- character / item layers ---------- */
 
-/* Objects & Tools: independent layer shown near the character.
- * Position and size are set by js/items.js (left/top = center point,
- * height = % of game area height, width keeps the image aspect). */
+/* Item: independent layer shown near the character. Position and size
+ * are set by js/items.js relative to the character's world position
+ * (left/top = item center, height = % of game area height, width
+ * keeps the image aspect). The defaults below are only the initial
+ * CSS values - JS updates left/top every frame of the movement. */
 .item-layer {
   position: absolute;
   left: 56.5%;

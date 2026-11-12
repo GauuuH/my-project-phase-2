@@ -7,8 +7,10 @@
  *    character / item feedback is triggered before 4/4.
  * The main status shows how many roles are READY, e.g. "2 / 4 READY".
  * At 4/4 the four results are combined, the command is revealed AND
- * executed once (environment + character + items). The NEXT ROUND
- * button then resets the round and re-arms every phone.
+ * executed once: weather changes, the character plays the Action
+ * animation, physically moves in the Direction and the Item follows
+ * the character. The NEXT ROUND button then resets the round and
+ * re-arms every phone.
  * Works with any number of players (1-2 phones are enough to test).
  */
 
@@ -22,7 +24,7 @@ var state = {
 };
 
 var nextRoundBtn = document.getElementById("nextRoundBtn");
-var commandTimer = null; /* pending Object -> Tool item swap of this round */
+var itemTimer = null;   /* pending Eat + Pizza hide (this round) */
 
 var world = document.getElementById("world");
 var resultText = document.getElementById("resultText");
@@ -202,22 +204,22 @@ function renderStatus() {
 var ENV_WORD = { Sunny: "sun", Rain: "rain", Snow: "snow" };
 
 /* Read the four results (fixed role order) and build:
- *   line:     "Rain · Run · Pizza · Umbrella"
- *   sentence: "Run in the rain with a pizza and an umbrella." */
+ *   line:     "Rain · Run · Pizza · Right"
+ *   sentence: "Run right in the rain with a pizza." */
 function buildCommand() {
   var env = state.results.get("environment");
   var act = state.results.get("action");
-  var obj = state.results.get("object");
-  var tool = state.results.get("tool");
+  var item = state.results.get("item");
+  var dir = state.results.get("direction");
 
-  var line = [env, act, obj, tool].join(" · ");
+  var line = [env, act, item, dir].join(" · ");
 
   var envWord = ENV_WORD[env] || String(env).toLowerCase();
   var actWord = String(act);
   var sentence = actWord.charAt(0) + actWord.slice(1).toLowerCase() +
+    " " + String(dir).toLowerCase() +
     " in the " + envWord + " with " +
-    article(String(obj).toLowerCase()) + " and " +
-    article(String(tool).toLowerCase()) + ".";
+    article(String(item).toLowerCase()) + ".";
 
   return { line: line, sentence: sentence };
 }
@@ -231,59 +233,88 @@ function article(word) {
 /* result -> existing system call (see js/environment.js, js/animations.js,
  * js/items.js - nothing new is built here) */
 var RESULT_ENV = { Sunny: "sunny", Rain: "rain", Snow: "snow" };
-var RESULT_CHAR = { Walk: "walk", Run: "run", Jump: "jump", Fall: "fall", Eat: "eat" };
+var RESULT_CHAR = { Jump: "jump", Fall: "fall", Eat: "eat" };
 var RESULT_ITEM = {
   Pizza: "pizza", Football: "football",
   Umbrella: "umbrella", Hammer: "hammer", Flashlight: "flashlight", Phone: "phone",
 };
 
+/* Action + Direction -> character animation state. Walk and Run have
+ * real left/right-facing assets, so the animation always matches the
+ * movement direction. Up / Down keep the right-facing asset (there are
+ * no up/down assets and no mirroring) while the world movement still
+ * follows the true direction. Jump / Fall / Eat have no direction
+ * variants. */
+function charStateFor(act, dir) {
+  if (act === "Walk") return dir === "Left" ? "walkLeft" : "walkRight";
+  if (act === "Run") return dir === "Left" ? "runLeft" : "runRight";
+  return RESULT_CHAR[act];
+}
+
+/* How long the one-shot Eat animation plays (frames / fps). */
+function eatAnimationMs() {
+  var cfg = (typeof ANIM_CONFIG !== "undefined") ? ANIM_CONFIG.eat : null;
+  if (!cfg) return 4000;
+  return (cfg.frames.length / cfg.fps) * 1000;
+}
+
 /* Run the four combined results on the laptop:
- *   Environment first, the Action animation at the same time, then the
- *   Object item, and the Tool item shortly after (the item system can
- *   only show one item at a time, so they take turns).
+ *   Environment changes right away, the character plays the Action
+ *   animation (Walk/Run pick the real left/right-facing asset that
+ *   matches the Direction) AND moves smoothly toward the Direction
+ *   (speed depends on the action), and the Item attaches to the
+ *   character and follows it. Eat + Pizza: the pizza sits at the
+ *   mouth while the eat animation plays, then disappears.
  * Called only from the one-time 4/4 reveal in renderStatus(). */
 function executeCommand() {
   var env = state.results.get("environment");
   var act = state.results.get("action");
-  var obj = state.results.get("object");
-  var tool = state.results.get("tool");
+  var item = state.results.get("item");
+  var dir = state.results.get("direction");
 
   var envId = RESULT_ENV[env];
   if (envId) setEnvironment(envId);
 
-  var charState = RESULT_CHAR[act];
+  var charState = charStateFor(act, dir);
   if (charState) playCharacterState(charState);
 
-  var objId = RESULT_ITEM[obj];
-  if (objId) showItem(objId);
-
-  var toolId = RESULT_ITEM[tool];
-  if (toolId) {
-    commandTimer = setTimeout(function () {
-      commandTimer = null;
-      showItem(toolId);
-    }, 2500);
+  /* Direction: physically move the character canvas (no teleport) */
+  if (dir && typeof moveCharacter === "function") {
+    moveCharacter(dir, String(act).toLowerCase());
   }
 
-  console.log("[Command] " + [env, act, obj, tool].join(" · "));
+  var itemId = RESULT_ITEM[item];
+  if (itemId) {
+    showItem(itemId); /* item follows the character from now on */
+    if (act === "Eat" && item === "Pizza") {
+      itemTimer = setTimeout(function () {
+        itemTimer = null;
+        showItem("none");
+      }, eatAnimationMs());
+    }
+  }
+
+  console.log("[Command] " + [env, act, item, dir].join(" · "));
 }
 
 /* ---------- next round ---------- */
 
 /* Reset everything for a new round: results are cleared (the players
- * stay joined), the world goes back to idle/sunny/no item, the phones
- * are told to re-arm their interaction and the status returns to
- * 0 / 4 READY. */
+ * stay joined), the character goes back to the center in idle, the
+ * weather returns to sunny, the item disappears, any pending movement
+ * / item timer is cancelled, the phones are told to re-arm their
+ * interaction and the status returns to 0 / 4 READY. */
 function nextRound() {
-  /* cancel a pending Object -> Tool item swap */
-  if (commandTimer) {
-    clearTimeout(commandTimer);
-    commandTimer = null;
+  /* cancel a pending Eat + Pizza hide */
+  if (itemTimer) {
+    clearTimeout(itemTimer);
+    itemTimer = null;
   }
 
   state.results.clear();
   state.combined = false;
 
+  if (typeof resetCharacterPosition === "function") resetCharacterPosition();
   playCharacterState("idle");
   setEnvironment("sunny");
   showItem("none");

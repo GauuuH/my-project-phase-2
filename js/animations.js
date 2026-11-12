@@ -1,4 +1,4 @@
-/* DECIDER - Character Animation System (7 states)
+/* DECIDER - Character Animation System (11 states)
  *
  * Every animation is a folder of single-frame PNGs. Frames are
  * preloaded and checked (the console logs how many were found).
@@ -20,10 +20,18 @@
  * ================================================================ */
 
 var CHAR_PLACEMENT = {
-  floorY: 68,      /* % of map height where the feet stand */
-  centerX: 50,     /* % of map width for the body center */
+  floorY: 68,      /* % of map height where the feet stand (default) */
+  centerX: 50,     /* % of map width for the body center (default) */
   bodyHeight: 24.1 /* % of map height of the standing body (idle = reference) */
 };
+
+/* Character world position: where the character currently stands, in
+ * % of the game area (characterWorldX = body center x, characterWorldY
+ * = feet y). Defaults = CHAR_PLACEMENT. The Direction movement eases
+ * these values every frame and applyCharacterPlacement() reads them,
+ * so the sprite calibration stays untouched. */
+var characterWorldX = CHAR_PLACEMENT.centerX;
+var characterWorldY = CHAR_PLACEMENT.floorY;
 
 var ANIM_CONFIG = {
   idle: {
@@ -40,6 +48,32 @@ var ANIM_CONFIG = {
   },
   run: {
     folder: "../assets/char/run/frames/", frames: seq(1, 48),
+    fps: 12,
+    loop: true,
+    calib: { bodyFrac: 0.6973, feetFrac: 0.8184, centerFrac: 0.5322, canvasW: 512, canvasH: 512 }
+  },
+  /* Directional Walk / Run assets (real left- and right-facing frames,
+   * no mirroring). Same fps / calibration as the classic walk & run. */
+  walkRight: {
+    folder: "E:/OCAD/DF_2014_Atelier1/PlayTest/ArtAssets/WalkRight/frames/", frames: seq(1, 48),
+    fps: 12,
+    loop: true,
+    calib: { bodyFrac: 0.6895, feetFrac: 0.8184, centerFrac: 0.5049, canvasW: 512, canvasH: 512 }
+  },
+  walkLeft: {
+    folder: "E:/OCAD/DF_2014_Atelier1/PlayTest/ArtAssets/WalkLeft/frames/", frames: seq(1, 35),
+    fps: 12,
+    loop: true,
+    calib: { bodyFrac: 0.6895, feetFrac: 0.8184, centerFrac: 0.5049, canvasW: 512, canvasH: 512 }
+  },
+  runRight: {
+    folder: "E:/OCAD/DF_2014_Atelier1/PlayTest/ArtAssets/RunningToRight/", frames: seq(1, 25),
+    fps: 12,
+    loop: true,
+    calib: { bodyFrac: 0.6973, feetFrac: 0.8184, centerFrac: 0.5322, canvasW: 512, canvasH: 512 }
+  },
+  runLeft: {
+    folder: "E:/OCAD/DF_2014_Atelier1/PlayTest/ArtAssets/RunningToLeft/frames/", frames: seq(26, 48),
     fps: 12,
     loop: true,
     calib: { bodyFrac: 0.6973, feetFrac: 0.8184, centerFrac: 0.5322, canvasW: 512, canvasH: 512 }
@@ -165,7 +199,9 @@ function showCharacterFrame(i) {
 }
 
 /* keep the character's visual size / feet / center consistent between
- * states, even though the canvases and sprite offsets differ */
+ * states, even though the canvases and sprite offsets differ. The
+ * canvas position follows the current character world position, so the
+ * whole character can walk around without touching the sprite frames. */
 function applyCharacterPlacement(cfg) {
   var c = cfg.calib;
   var world = document.getElementById("world");
@@ -173,8 +209,8 @@ function applyCharacterPlacement(cfg) {
 
   var dispH = CHAR_PLACEMENT.bodyHeight / c.bodyFrac;          /* % of world height */
   var dispW = dispH * whRatio * (c.canvasW / c.canvasH);       /* % of world width */
-  var left = CHAR_PLACEMENT.centerX - c.centerFrac * dispW;
-  var top = CHAR_PLACEMENT.floorY - c.feetFrac * dispH;
+  var left = characterWorldX - c.centerFrac * dispW;
+  var top = characterWorldY - c.feetFrac * dispH;
 
   charDisplay.style.height = dispH + "%";
   charDisplay.style.width = "auto";
@@ -182,12 +218,89 @@ function applyCharacterPlacement(cfg) {
   charDisplay.style.top = top + "%";
 }
 
+/* ---------- smooth character movement (Direction role) ---------- */
+
+/* One move: the character travels some % of the game area in the
+ * chosen direction. Distance + duration are per action (easy to
+ * tune), and the character stays inside MOVE_CONFIG.bounds. */
+var MOVE_CONFIG = {
+  travel: {
+    walk: { dist: 0.12, ms: 1400 },  /* steady pace */
+    run:  { dist: 0.15, ms: 800 },   /* fast pace */
+    jump: { dist: 0.10, ms: 1000 },
+    fall: { dist: 0.06, ms: 900 },   /* short slide */
+    eat:  { dist: 0.02, ms: 900 },   /* barely moves */
+  },
+  /* body center x / feet y stay inside these % bounds of the world */
+  bounds: { minX: 10, maxX: 90, minY: 42, maxY: 82 },
+};
+
+var charMove = null; /* active move: { sx, sy, ex, ey, start, ms, onDone } */
+
+function clampNum(v, min, max) { return Math.max(min, Math.min(max, v)); }
+
+/* Start moving the whole character canvas toward a direction (Left /
+ * Right / Up / Down). The position is eased by updateCharacterMove()
+ * inside the main characterTick loop, so movement and animation stay
+ * frame-synced. onDone fires when the move finishes. */
+function moveCharacter(direction, action, onDone) {
+  var t = MOVE_CONFIG.travel[action] || MOVE_CONFIG.travel.walk;
+  var dist = t.dist * 100; /* % of the game area */
+  var dx = 0, dy = 0;
+  if (direction === "Left") dx = -dist;
+  else if (direction === "Right") dx = dist;
+  else if (direction === "Up") dy = -dist;
+  else if (direction === "Down") dy = dist;
+
+  var b = MOVE_CONFIG.bounds;
+  charMove = {
+    sx: characterWorldX, sy: characterWorldY,
+    ex: clampNum(characterWorldX + dx, b.minX, b.maxX),
+    ey: clampNum(characterWorldY + dy, b.minY, b.maxY),
+    start: 0, /* set on the first tick */
+    ms: t.ms,
+    onDone: onDone || null,
+  };
+}
+
+/* NEXT ROUND: stop any movement and put the character back on its
+ * starting spot in the middle of the game area. */
+function resetCharacterPosition() {
+  charMove = null;
+  characterWorldX = CHAR_PLACEMENT.centerX;
+  characterWorldY = CHAR_PLACEMENT.floorY;
+  if (charCurrent) applyCharacterPlacement(ANIM_CONFIG[charCurrent]);
+}
+
+/* step the active move (called every frame by characterTick) */
+function updateCharacterMove(now) {
+  if (!charMove) return;
+  if (!charMove.start) charMove.start = now;
+  var t = Math.min(1, (now - charMove.start) / charMove.ms);
+  var e = 1 - (1 - t) * (1 - t); /* ease-out: quick start, gentle stop */
+
+  characterWorldX = charMove.sx + (charMove.ex - charMove.sx) * e;
+  characterWorldY = charMove.sy + (charMove.ey - charMove.sy) * e;
+  if (charCurrent) applyCharacterPlacement(ANIM_CONFIG[charCurrent]);
+  /* keep any shown item glued to the character (js/items.js) */
+  if (typeof updateItemFollow === "function") updateItemFollow();
+
+  if (t >= 1) {
+    var done = charMove.onDone;
+    charMove = null;
+    if (done) done();
+  }
+}
+
 /* ---------- main loop ---------- */
 
 function characterTick(now) {
   requestAnimationFrame(characterTick);
-  if (!charFrames) return;
+
   if (!charLastTime) charLastTime = now;
+  updateCharacterMove(now);
+
+  if (!charFrames) return;
 
   charAccumulator += now - charLastTime;
   charLastTime = now;

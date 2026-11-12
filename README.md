@@ -18,9 +18,10 @@ DECIDER 游戏 Phase 2 基础网页原型（对应 `PLAN.md` 的 Day 2–3，提
   - 每个动画有独立的 `fps`（在 `js/animations.js` 顶部 `ANIM_CONFIG`），并带校准数据，切换动画时角色的身体大小、脚底位置和中心位置保持一致。
   - Walk / Run / Idle 循环播放；Jump / Fall / Blown by Wind / Eat 播放一遍后自动回到 Idle。
   - **Character Test Panel**（页面右侧竖排按钮，开发测试用，之后会删除）可手动切换动画。
-- **Objects & Tools**：Pizza / Football / Umbrella / Hammer / Flashlight / Phone / None，由 `js/items.js` 管理。
+- **Items**：Pizza / Football / Umbrella / Hammer / Flashlight / Phone / None，由 `js/items.js` 管理。
   - 作为独立图层显示在角色附近（不合并进角色动画），同一时间只显示一个，保持图片原比例和透明背景。
-  - **Item Test Panel**（CHAR TEST 下方，开发测试用）可手动切换。位置/大小在 `js/items.js` 顶部 `ITEM_CONFIG` 里调（left/top = 中心点 %，height = 高度 %）。
+  - **Item 跟随角色**：Item 不再固定在世界坐标，而是以角色当前位置（`characterWorldX/Y`）为基准 + 锚点偏移（`js/items.js` 顶部 `ITEM_ANCHORS`，hand / mouth / feet），角色移动的每一帧都会同步更新 Item 位置。Umbrella / Hammer / Flashlight / Phone 在身体右侧手边，Football 在脚边，Pizza 在嘴附近。
+  - **Item Test Panel**（CHAR TEST 下方，开发测试用）可手动切换。大小在 `js/items.js` 顶部 `ITEM_CONFIG` 里调（height = 高度 %）。
   - 素材来源：`protection.png` → umbrella，`mobile-phone.png` → phone（仅重命名复制，内容未改）。
 - **Environment Test Panel**：顶栏三个按钮 ☀️ Sunny / 🌧️ Rain / ❄️ Snow，同一时间只有一种环境。
   - Sunny：地图本身的晴天 + 轻微暖光。
@@ -36,23 +37,25 @@ DECIDER 游戏 Phase 2 基础网页原型（对应 `PLAN.md` 的 Day 2–3，提
    | --- | --- |
    | 🌍 Environment | 💨 Blow（麦克风吹气，p5.AudioIn + p5.Amplitude，`amplitude.getLevel() > 0.05` 判定吹气成功） |
    | ⚡ Action | 📳 Shake（DeviceMotion 摇晃） |
-   | 📦 Object | 📐 Tilt（DeviceOrientation 倾斜） |
-   | 🔧 Tool | 👋 Swipe（快速滑动） |
-   Press & Hold（👆）保留在页面上但**不绑定任何 Role**，仅作 dev/test 交互，不产生游戏结果、不参与本轮。页面下方保留 **Manual test (dev)** 按钮，可手动切换测试。检测成功后随机生成该 Role 的一个结果（结果池在 `DECIDER.ROLE_RESULTS`）：
+   | 📦 Item | 📐 Tilt（DeviceOrientation 倾斜） |
+   | 🧭 Direction | 👋 Swipe（快速滑动，**结果 = 真实滑动方向**） |
+   Press & Hold（👆）保留在页面上但**不绑定任何 Role**，仅作 dev/test 交互，不产生游戏结果、不参与本轮。页面下方保留 **Manual test (dev)** 按钮，可手动切换测试。检测成功后的结果（结果池在 `DECIDER.ROLE_RESULTS`）：
    - Environment：Sunny / Rain / Snow
-   - Action：Walk / Run / Jump / Fall / Eat（原 Movement 与 Action 合并）
-   - Object：Pizza / Football
-   - Tool：Umbrella / Hammer / Flashlight / Phone
+   - Action：Walk / Run / Jump / Fall / Eat
+   - Item：Pizza / Football / Umbrella / Hammer / Flashlight / Phone（原 Object + Tool 合并）
+   - Direction：Left / Right / Up / Down（**真实 Swipe 方向**，非随机；DEV Fill 时才随机补）
    结果生成后保持显示，交互同时锁定（点 ⟳ Try again 解锁重试），暂不触发笔记本上的反馈。阈值在 `js/interactions.js` 顶部 `INTER_CONFIG`。
 5. 玩家完成自己 Role 的交互得到结果后，手机立即通过 MQTT 向房间发送 `player-result`（playerId / roleId / result），手机进入 **READY — result sent**，本轮不可重复提交（手动测试其他 Role 的交互只在本机显示，不会提交）。
 6. 笔记本收到结果后**只按 Role 秘密保存**（不显示具体选择、不触发任何环境/角色/道具反馈）；四个 Role Card 中已提交的显示 **● READY**，未提交的显示 WAITING/online；主状态显示 **X / 4 READY**（1–2 台手机也能正常测试）。
 7. **Combine & Command Reveal + Execute**：当四个 Role 的结果全部收到（`state.results.size === DECIDER.ROLES.length`）时，主屏幕一次性读取四个结果，Reveal 完整 Command 并**执行一次**（`js/screen.js` 的 `executeCommand`），例如：
-   - `Rain · Run · Pizza · Umbrella`
-   - `Run in the rain with a pizza and an umbrella.`
-   执行直接复用现有系统：Environment → `setEnvironment()`，Action → `playCharacterState()`，Object/Tool → `showItem()`。顺序为：先切环境，同时播角色动画，先显示 Object，约 2.5 秒后换显示 Tool（Item 系统一次只显示一个）。每轮只执行一次（不受每秒 render() 影响）。
+   - `Rain · Run · Pizza · Right`
+   - `Run right in the rain with a pizza.`
+   执行直接复用现有系统：Environment → `setEnvironment()`；Action → `playCharacterState()`；Direction → `moveCharacter()`（`js/animations.js`，平滑位移动画，无瞬移）；Item → `showItem()`（跟随角色）。每轮只执行一次（不受每秒 render() 影响）。
+   - **Character movement**：Reveal 后角色按 Direction 平滑移动到新位置（Walk 较慢 / Run 更快 / Jump、Fall 中等 / Eat 几乎不动），移动距离在 `js/animations.js` 顶部 `MOVE_CONFIG`（每轮约 game area 的 12%–15%），并限制在 `MOVE_CONFIG.bounds` 内不会走出 Game Area。只移动 Character canvas 位置，不改 sprite PNG。
+   - **Eat + Pizza 特殊互动**：Pizza 显示在角色嘴附近 → Eat 动画播放 → 动画结束后 Pizza 自动消失；其他 Item 只需正确跟随角色。
    4/4 之前只显示 READY 计数，绝不泄露具体结果，也不触发角色/环境/道具。
-   - **DEV: Fill Missing Roles** 按钮（右侧 DEV 面板）：只为尚未 READY 的四个 Role 随机补测试结果（真实手机提交的结果不会被覆盖），补足 4/4 后走同一套 Combine → Reveal → Execute 流程。仅开发测试用。
-8. **NEXT ROUND**：Reveal 后主屏幕出现 **NEXT ROUND →** 按钮。点击后开始新一轮：清空 `state.results`、`combined = false`、取消未完成的 Item 切换计时器，Character 回 Idle、Environment 回 Sunny、Item 回 None、四个 Role Card 回到已加入但未 READY、主状态回到 `0 / 4 READY`；同时通过 MQTT 向房间广播 `round-reset`，每台已加入的手机收到后自动清除上一轮 Result/READY 状态并重新启动自己 Role 的交互，四个玩家无需退出或刷新即可直接开始第二轮。
+   - **DEV: Fill Missing Roles** 按钮（右侧 DEV 面板）：只为尚未 READY 的四个 Role 随机补测试结果（真实手机提交的结果不会被覆盖；Direction 随机 Left/Right/Up/Down），补足 4/4 后走同一套 Combine → Reveal → Execute 流程。仅开发测试用。
+8. **NEXT ROUND**：Reveal 后主屏幕出现 **NEXT ROUND →** 按钮。点击后开始新一轮：清空 `state.results`、`combined = false`、取消未完成的 Item/移动计时器，Character 回到初始中央位置并回 Idle、Environment 回 Sunny、Item 回 None、Direction 状态清除、四个 Role Card 回到已加入但未 READY、主状态回到 `0 / 4 READY`；同时通过 MQTT 向房间广播 `round-reset`，每台已加入的手机收到后自动清除上一轮 Result/READY 状态并重新启动自己 Role 的交互，四个玩家无需退出或刷新即可直接开始第二轮。
 
 > 联机要求：笔记本和手机都要能上网（消息经公共 MQTT 服务器中转）。房间码保存在本地，下次打开还会沿用同一个码。
 
@@ -61,7 +64,7 @@ DECIDER 游戏 Phase 2 基础网页原型（对应 `PLAN.md` 的 Day 2–3，提
 - **跨设备通信**：MQTT over WebSocket，使用公共服务器 `broker.emqx.io`（备用 `broker.hivemq.com`），客户端库 `js/vendor/mqtt.min.js` 已下载到项目里，不依赖任何 CDN，无需注册、无需自己部署服务器。
 - **隐私提醒**：公共服务器上任何知道房间码的人都能收发该房间的消息。原型阶段可以接受；正式版（Day 4 后续）换成自己的服务器时，只需改 `js/shared.js` 一个文件。
 - **Idle 动画**：`js/idle.js` 顶部 `IDLE_CONFIG` 可调整速度（`fps`，当前 6）和帧列表；帧图片在 `assets/idle/frames/`，路径相对 `screen/index.html` 页面。
-- 四个角色（Environment / Action / Object / Tool），每个角色同一时间只有一个玩家（后加入的覆盖先加入的）；原 Movement 角色已并入 Action。
+- 四个角色（Environment / Action / Item / Direction），每个角色同一时间只有一个玩家（后加入的覆盖先加入的）；原 Object + Tool 已合并为 Item，Swipe 从 Tool 改为 Direction。
 
 ## 项目结构
 
@@ -81,9 +84,9 @@ DECIDER 游戏 Phase 2 基础网页原型（对应 `PLAN.md` 的 Day 2–3，提
     ├── shared.js             共享数据 + 房间码 + MQTT 通信层
     ├── screen.js             主屏幕逻辑
     ├── player.js             玩家页逻辑（加入/心跳/离开）
-    ├── interactions.js       五种真实手机交互（阈值在顶部 INTER_CONFIG）
-    ├── animations.js         角色动画系统（7 状态，fps 在顶部 ANIM_CONFIG）
-    ├── items.js              Objects & Tools 图层（位置/大小在顶部 ITEM_CONFIG）
+    ├── interactions.js       五种真实手机交互（阈值在顶部 INTER_CONFIG；Swipe 带真实方向判断）
+    ├── animations.js         角色动画系统（7 状态，fps 在顶部 ANIM_CONFIG；含 characterWorldX/Y 与 MOVE_CONFIG 平滑移动）
+    ├── items.js              Item 图层（角色相对定位，锚点在顶部 ITEM_ANCHORS）
     └── environment.js        Sunny/Rain/Snow 环境系统（参数在顶部 ENV_CONFIG）
 ```
 
