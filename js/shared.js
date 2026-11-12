@@ -1,13 +1,29 @@
-/* DECIDER - shared game data + cross-tab messaging (Phase 2 basic prototype)
+/* DECIDER - shared game data + realtime messaging (Phase 2)
  *
- * BroadcastChannel lets the Shared Main Screen and the Player pages talk to
- * each other inside the same browser. A real server (Day 4 of PLAN.md) will
- * replace this layer so real phones can join the same room.
+ * Transport: MQTT over WebSockets through a public broker. The laptop
+ * (Shared Main Screen) and every phone join the same "room" topic, so
+ * they can talk to each other across devices — no own server needed.
+ *
+ * The message protocol between pages stays the same:
+ *   { type: "player-join",      player: { id, name, roleId } }
+ *   { type: "player-action",    playerId, actionId }
+ *   { type: "player-heartbeat", playerId }
+ *   { type: "player-leave",     playerId }
+ *   { type: "screen-ready" }
+ *
+ * NOTE: the broker is public, so anyone who knows the room code can read
+ * or send game messages. Fine for a prototype. Later (own server) this
+ * file is the only place that needs to change.
  */
 
-const DECIDER = {
-  CHANNEL: "decider-shared-world",
-  STORAGE_FALLBACK_KEY: "decider-channel-msg",
+var DECIDER = {
+  /* Public MQTT brokers (WebSocket). Tried in order if one fails. */
+  BROKERS: [
+    "wss://broker.emqx.io:8084/mqtt",
+    "wss://broker.hivemq.com:8884/mqtt",
+  ],
+  TOPIC_PREFIX: "decider/phase2/",
+  ROOM_KEY: "decider-room",      /* localStorage key for the room code */
   PLAYER_ID_KEY: "decider-player-id",
 
   /* Five player roles (placeholders - Day 1 will finalize the real rules).
@@ -39,44 +55,153 @@ function actionById(id) {
   return DECIDER.ACTIONS.find(function (a) { return a.id === id; });
 }
 
-/* Create a message channel between the screen tab and the player tabs. */
-function createChannel(onMessage) {
-  if (typeof BroadcastChannel !== "undefined") {
-    var ch = new BroadcastChannel(DECIDER.CHANNEL);
-    ch.onmessage = function (e) { onMessage(e.data); };
-    return {
-      send: function (msg) { ch.postMessage(msg); },
-      close: function () { ch.close(); },
-    };
+/* ---------- room code ---------- */
+
+var ROOM_CHARSET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; /* no I, L, O, 0, 1 */
+
+function generateRoomCode() {
+  var code = "";
+  for (var i = 0; i < 4; i++) {
+    code += ROOM_CHARSET[Math.floor(Math.random() * ROOM_CHARSET.length)];
+  }
+  return code;
+}
+
+function normalizeRoomCode(raw) {
+  return String(raw || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
+}
+
+function saveRoomCode(code) {
+  try { localStorage.setItem(DECIDER.ROOM_KEY, code); } catch (e) { /* ignore */ }
+}
+
+/* Room code priority: ?room= in the URL → last used code → new code.
+ * The screen passes createIfMissing=true so it always has a room.
+ * Players only read the last used code (to prefill the input). */
+function getRoomCode(createIfMissing) {
+  var fromUrl = null;
+  try { fromUrl = new URLSearchParams(location.search).get("room"); } catch (e) { /* ignore */ }
+  if (fromUrl && normalizeRoomCode(fromUrl)) {
+    var urlCode = normalizeRoomCode(fromUrl);
+    saveRoomCode(urlCode);
+    return urlCode;
   }
 
-  /* Fallback for very old browsers: localStorage + storage events
-   * (still works across tabs of the same browser). */
-  window.addEventListener("storage", function (e) {
-    if (e.key === DECIDER.STORAGE_FALLBACK_KEY && e.newValue) {
-      try {
-        onMessage(JSON.parse(e.newValue).d);
-      } catch (err) { /* ignore broken messages */ }
+  var stored = null;
+  try { stored = localStorage.getItem(DECIDER.ROOM_KEY); } catch (e) { /* ignore */ }
+  if (stored && normalizeRoomCode(stored)) return normalizeRoomCode(stored);
+
+  if (createIfMissing) {
+    var fresh = generateRoomCode();
+    saveRoomCode(fresh);
+    return fresh;
+  }
+  return "";
+}
+
+function topicForRoom(room) {
+  return DECIDER.TOPIC_PREFIX + room;
+}
+
+/* ---------- messaging channel ----------
+ *
+ * createChannel(onMessage, room, onStatus) returns { send, close }.
+ * onMessage(msg): called for every message that arrives in the room.
+ * onStatus(status): "connected" | "disconnected" | "failed".
+ */
+
+function createChannel(onMessage, room, onStatus) {
+  function status(s) { if (onStatus) onStatus(s); }
+
+  if (typeof mqtt === "undefined") {
+    console.error("[DECIDER] mqtt library not loaded (js/vendor/mqtt.min.js)");
+    status("failed");
+    return { send: function () {}, close: function () {} };
+  }
+
+  var topic = topicForRoom(room);
+  var brokerIndex = 0;
+  var client = null;
+  var closed = false;
+  var switchTimer = null;
+
+  function connect() {
+    if (closed) return;
+    if (brokerIndex >= DECIDER.BROKERS.length) {
+      status("failed");
+      console.error("[DECIDER] all brokers failed");
+      return;
     }
-  });
+
+    var url = DECIDER.BROKERS[brokerIndex];
+    console.log("[DECIDER] connecting to broker " + (brokerIndex + 1) + ": " + url);
+
+    client = mqtt.connect(url, {
+      clean: true,
+      reconnectPeriod: 3000,   /* retry every 3 s on the same broker */
+      connectTimeout: 8000,
+      clientId: "decider-" + Math.random().toString(36).slice(2, 10),
+    });
+
+    /* if this broker doesn't answer quickly, switch to the next one */
+    switchTimer = setTimeout(function () {
+      if (!closed && client && !client.connected) {
+        console.warn("[DECIDER] broker timed out, trying the next one");
+        try { client.end(true); } catch (e) { /* ignore */ }
+        brokerIndex++;
+        connect();
+      }
+    }, 9000);
+
+    client.on("connect", function () {
+      clearTimeout(switchTimer);
+      status("connected");
+      client.subscribe(topic, { qos: 0 });
+      console.log("[DECIDER] connected · room " + room + " · topic " + topic);
+    });
+
+    client.on("message", function (t, payload) {
+      if (t !== topic) return;
+      var msg;
+      try { msg = JSON.parse(payload.toString()); } catch (e) { return; }
+      onMessage(msg);
+    });
+
+    client.on("close", function () {
+      status("disconnected");
+      console.log("[DECIDER] connection closed");
+    });
+
+    client.on("error", function (err) {
+      console.warn("[DECIDER] mqtt error: " + (err && err.message ? err.message : err));
+    });
+  }
+
+  connect();
+
   return {
     send: function (msg) {
-      localStorage.setItem(
-        DECIDER.STORAGE_FALLBACK_KEY,
-        JSON.stringify({ t: Date.now(), d: msg })
-      );
-      localStorage.removeItem(DECIDER.STORAGE_FALLBACK_KEY);
+      if (client && client.connected) {
+        client.publish(topic, JSON.stringify(msg), { qos: 0 });
+      } else {
+        console.warn("[DECIDER] not connected, message dropped: " + (msg && msg.type));
+      }
     },
-    close: function () {},
+    close: function () {
+      closed = true;
+      clearTimeout(switchTimer);
+      try { client.end(true); } catch (e) { /* ignore */ }
+    },
   };
 }
 
-/* Stable id for this tab (sessionStorage = per tab). */
+/* Stable id for this tab/browser (sessionStorage = per tab). */
 function getPlayerId() {
-  var id = sessionStorage.getItem(DECIDER.PLAYER_ID_KEY);
+  var id = null;
+  try { id = sessionStorage.getItem(DECIDER.PLAYER_ID_KEY); } catch (e) { /* ignore */ }
   if (!id) {
     id = "p-" + Math.random().toString(36).slice(2, 9);
-    sessionStorage.setItem(DECIDER.PLAYER_ID_KEY, id);
+    try { sessionStorage.setItem(DECIDER.PLAYER_ID_KEY, id); } catch (e) { /* ignore */ }
   }
   return id;
 }

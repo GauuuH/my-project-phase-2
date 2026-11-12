@@ -1,48 +1,56 @@
 # my-project-phase-2
 
-DECIDER 游戏 Phase 2 基础网页原型（对应 `PLAN.md` 的 Day 2–3）。
+DECIDER 游戏 Phase 2 基础网页原型（对应 `PLAN.md` 的 Day 2–3，提前做了 Day 4 的跨设备联机）。
 
 ## 页面
 
 | 页面 | 文件 | 用途 |
 | --- | --- | --- |
 | 入口页 | `index.html` | 链接到下面两个页面 |
-| Shared Main Screen | `screen/index.html` | 笔记本上显示的共享主屏幕 |
-| 手机玩家页 | `player/index.html` | 模拟一台手机：选角色、加名字、发动作 |
+| Shared Main Screen | `screen/index.html` | 笔记本上显示的共享主屏幕（生成房间码） |
+| 手机玩家页 | `player/index.html` | 真手机/平板：输入房间码、选角色、发动作 |
 
-## 如何运行（无需安装任何东西）
+## 如何运行（联机版）
 
-1. 用 Chrome 或 Edge 双击打开 `index.html`（或直接打开 `screen/index.html`）。
-2. 在**同一个浏览器**的其他标签页/窗口中打开 `player/index.html`，模拟一台"手机"。
-3. 在玩家页：选角色 → 输入名字 → **Join the game** → 点击动作（💨 Blow / 📳 Shake / 👆 Press / 📐 Tilt）。
-4. 主屏幕会实时更新：中间世界播放对应效果、底部角色卡显示在线状态、五个角色都用过动作后会显示组合结果。
+1. 笔记本用 Chrome/Edge 打开 `screen/index.html`（本地双击，或 Pages 上的链接均可）。
+2. 记住主屏幕右上角的 **4 位房间码**（如 `KX7P`）。
+3. 手机上打开玩家页 `player/index.html`：输入房间码 → 选角色 → 输入名字 → **Join the game** → 点击动作（💨 Blow / 📳 Shake / 👆 Press / 📐 Tilt）。
+4. 主屏幕实时更新：角色卡显示玩家、中间角色播放对应效果、五个角色都用过动作后显示组合结果。
 
-## 当前原型说明
+> 联机要求：笔记本和手机都要能上网（消息经公共 MQTT 服务器中转）。房间码保存在本地，下次打开还会沿用同一个码。
 
-- 主屏幕和"手机"之间使用浏览器自带的 `BroadcastChannel` 通信，所以必须在**同一台电脑的同一个浏览器**里打开（这是 Day 4 之前的临时方案）。
-- 五个角色（Environment / Movement / Action / Object / Tool）是占位设计，Day 1 确定最终规则后会替换。
-- 每个角色同一时间只有一个玩家（后加入的覆盖先加入的）。
-- Blow 和 Shake 目前是按钮模拟；之后会换成手机麦克风吹气、加速度计摇晃等真实物理交互。
+## 技术说明
+
+- **跨设备通信**：MQTT over WebSocket，使用公共服务器 `broker.emqx.io`（备用 `broker.hivemq.com`），客户端库 `js/vendor/mqtt.min.js` 已下载到项目里，不依赖任何 CDN，无需注册、无需自己部署服务器。
+- **隐私提醒**：公共服务器上任何知道房间码的人都能收发该房间的消息。原型阶段可以接受；正式版（Day 4 后续）换成自己的服务器时，只需改 `js/shared.js` 一个文件。
+- **Idle 动画**：`js/idle.js` 顶部 `IDLE_CONFIG` 可调整速度（`fps`，当前 6）和帧列表；帧图片在 `assets/idle/frames/`，路径相对 `screen/index.html` 页面。
+- 五个角色（Environment / Movement / Action / Object / Tool）是占位设计，Day 1 确定最终规则后替换；每个角色同一时间只有一个玩家（后加入的覆盖先加入的）。
 
 ## 项目结构
 
 ```
-├── index.html           入口页
-├── screen/index.html    Shared Main Screen（笔记本）
-├── player/index.html    手机玩家页
-├── assets/idle/frames/   Idle 动画帧（008.png / 009.png）
+├── index.html                入口页
+├── screen/index.html         Shared Main Screen（笔记本）
+├── player/index.html         手机玩家页
+├── assets/idle/frames/       Idle 动画帧（008.png / 009.png）
 ├── css/
-│   ├── base.css         共享基础样式
-│   ├── screen.css       主屏幕样式
-│   └── player.css       玩家页样式
+│   ├── base.css              共享基础样式
+│   ├── screen.css            主屏幕样式
+│   └── player.css            玩家页样式
 └── js/
-    ├── shared.js        共享数据（角色/动作）+ 跨标签页通信
-    ├── screen.js        主屏幕逻辑
-    ├── idle.js          角色 Idle 动画（速度参数在文件顶部 IDLE_CONFIG）
-    └── player.js        玩家页逻辑
+    ├── vendor/mqtt.min.js    MQTT 客户端库（本地）
+    ├── shared.js             共享数据 + 房间码 + MQTT 通信层
+    ├── screen.js             主屏幕逻辑
+    ├── player.js             玩家页逻辑
+    └── idle.js               角色 Idle 动画（速度参数在顶部 IDLE_CONFIG）
 ```
+
+## GitHub Pages
+
+站点地址：`https://gauuuh.github.io/my-project-phase-2/`
+（`Settings → Pages → Build and deployment → Deploy from a branch → main / (root)`）
 
 ## 下一步（对应 PLAN.md）
 
-- **Day 4**：用 Node.js + Socket.IO 服务器替换 `BroadcastChannel`，让真正的手机也能连入同一个房间。
+- **Day 4 完整版**：可选把公共 MQTT 服务器换成自己的 Node.js + Socket.IO 服务器（托管到 Render/Railway），房间管理更可控。
 - **Day 5 / Playtest**：多名玩家实机测试不同角色和隐藏选择如何形成可理解的共享结果。

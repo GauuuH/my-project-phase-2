@@ -41,6 +41,11 @@ body {
   box-shadow: 0 0 10px #3ddc84;
 }
 
+.room .dot.off {
+  background: #f87171;
+  box-shadow: 0 0 10px #f87171;
+}
+
 .room-code {
   margin-left: auto;
   font-size: 13px;
@@ -48,7 +53,11 @@ body {
 }
 
 .room-code b {
-  color: var(--text);
+  color: var(--accent);
+  font-size: 18px;
+  letter-spacing: 3px;
+  font-family: Consolas, "Courier New", monospace;
+  text-shadow: 0 0 12px rgba(56, 225, 255, 0.4);
 }
 
 /* ---------- stage ---------- */

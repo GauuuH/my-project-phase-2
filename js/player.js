@@ -2,6 +2,7 @@
 
 var roleGrid = document.getElementById("roleGrid");
 var nameInput = document.getElementById("nameInput");
+var roomInput = document.getElementById("roomInput");
 var joinBtn = document.getElementById("joinBtn");
 var joinSection = document.getElementById("joinSection");
 var actionSection = document.getElementById("actionSection");
@@ -9,6 +10,8 @@ var actionGrid = document.getElementById("actionGrid");
 var youIcon = document.getElementById("youIcon");
 var youName = document.getElementById("youName");
 var youRole = document.getElementById("youRole");
+var youRoom = document.getElementById("youRoom");
+var youStatus = document.getElementById("youStatus");
 var lastAction = document.getElementById("lastAction");
 var leaveBtn = document.getElementById("leaveBtn");
 
@@ -16,8 +19,19 @@ var selectedRoleId = null;
 var joined = false;
 var heartbeat = null;
 var playerId = getPlayerId();
+var channel = null;
 
-var channel = createChannel(handleMessage);
+/* Prefill the room code: ?room=XXXX in the URL first, then the last used code. */
+(function () {
+  var fromUrl = null;
+  try { fromUrl = new URLSearchParams(location.search).get("room"); } catch (e) { /* ignore */ }
+  if (fromUrl && normalizeRoomCode(fromUrl)) {
+    roomInput.value = normalizeRoomCode(fromUrl);
+  } else {
+    var stored = getRoomCode(false);
+    if (stored) roomInput.value = stored;
+  }
+})();
 
 /* ---------- build UI ---------- */
 
@@ -55,16 +69,28 @@ DECIDER.ACTIONS.forEach(function (action) {
 /* ---------- join / leave ---------- */
 
 function updateJoinBtn() {
-  joinBtn.disabled = !(selectedRoleId && nameInput.value.trim());
+  joinBtn.disabled = !(
+    selectedRoleId &&
+    nameInput.value.trim() &&
+    normalizeRoomCode(roomInput.value)
+  );
 }
 
 nameInput.oninput = updateJoinBtn;
+roomInput.oninput = updateJoinBtn;
 
 joinBtn.onclick = function () {
   var name = nameInput.value.trim();
-  if (!selectedRoleId || !name) return;
+  var room = normalizeRoomCode(roomInput.value);
+  if (!selectedRoleId || !name || !room) return;
 
+  saveRoomCode(room);
   joined = true;
+
+  /* connect to the room the laptop is showing */
+  setYouStatus("warn", "● Connecting to room " + room + "…");
+  channel = createChannel(handleMessage, room, updateConnStatus);
+
   announceJoin();
   heartbeat = setInterval(function () {
     channel.send({ type: "player-heartbeat", playerId: playerId });
@@ -74,6 +100,7 @@ joinBtn.onclick = function () {
   youIcon.textContent = role.icon;
   youName.textContent = name;
   youRole.textContent = role.name + " · " + role.controller;
+  youRoom.textContent = "Room: " + room;
 
   joinSection.hidden = true;
   actionSection.hidden = false;
@@ -84,6 +111,8 @@ leaveBtn.onclick = function () {
   if (!joined) return;
   clearInterval(heartbeat);
   channel.send({ type: "player-leave", playerId: playerId });
+  channel.close();
+  channel = null;
   joined = false;
   actionSection.hidden = true;
   joinSection.hidden = false;
@@ -100,6 +129,21 @@ function announceJoin() {
     },
   });
   channel.send({ type: "player-heartbeat", playerId: playerId });
+}
+
+function setYouStatus(cls, text) {
+  youStatus.className = "you-status" + (cls ? " " + cls : "");
+  youStatus.textContent = text;
+}
+
+function updateConnStatus(status) {
+  if (status === "connected") {
+    setYouStatus("ok", "● Connected to room " + normalizeRoomCode(roomInput.value));
+  } else if (status === "failed") {
+    setYouStatus("err", "● Could not connect — check your internet");
+  } else {
+    setYouStatus("warn", "● Reconnecting…");
+  }
 }
 
 /* ---------- messages from the screen ---------- */

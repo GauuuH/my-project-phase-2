@@ -170,3 +170,19 @@ input:focus {
   text-align: center;
   min-height: 1.2em;
 }
+
+/* ---------- room / connection status ---------- */
+
+.you-room {
+  color: var(--accent);
+}
+
+.you-status {
+  font-size: 11px;
+  text-align: center;
+  min-height: 1.2em;
+}
+
+.you-status.ok { color: #3ddc84; }
+.you-status.warn { color: #fbbf24; }
+.you-status.err { color: #f87171; }

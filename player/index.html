@@ -20,8 +20,11 @@
       <h2>2 · Your name</h2>
       <input id="nameInput" placeholder="e.g. Alex" maxlength="12" autocomplete="off">
 
+      <h2>3 · Room code</h2>
+      <input id="roomInput" placeholder="Code on the laptop screen" maxlength="6" autocomplete="off">
+
       <button class="join-btn" id="joinBtn" disabled>Join the game</button>
-      <p class="hint">Open the Shared Main Screen in another tab on the laptop.</p>
+      <p class="hint">Open the Shared Main Screen on the laptop, then enter its room code here.</p>
     </section>
 
     <section class="actions" id="actionSection" hidden>
@@ -30,9 +33,11 @@
         <div class="you-info">
           <b id="youName"></b>
           <small id="youRole"></small>
+          <small id="youRoom" class="you-room"></small>
         </div>
         <button class="leave-btn" id="leaveBtn">Leave</button>
       </div>
+      <p class="you-status" id="youStatus"></p>
 
       <h2>Your actions</h2>
       <div class="action-grid" id="actionGrid"></div>
@@ -40,6 +45,7 @@
     </section>
   </main>
 
+  <script src="../js/vendor/mqtt.min.js"></script>
   <script src="../js/shared.js"></script>
   <script src="../js/player.js"></script>
 </body>

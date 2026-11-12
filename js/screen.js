@@ -19,11 +19,33 @@ var resultText = document.getElementById("resultText");
 var resultSub = document.getElementById("resultSub");
 var eventLogText = document.getElementById("eventLogText");
 var playersEl = document.getElementById("players");
+var roomCodeEl = document.getElementById("roomCode");
+var connDot = document.getElementById("connDot");
+var connText = document.getElementById("connText");
 
-var channel = createChannel(handleMessage);
+/* Room code: the laptop keeps the same code every visit, so phones can
+ * join again without typing a new one. */
+var room = getRoomCode(true);
+roomCodeEl.textContent = room;
 
-/* Let player tabs that are already open know we are here.
- * Re-announced regularly so a refreshed screen re-syncs quickly. */
+var channel = createChannel(handleMessage, room, updateConnStatus);
+
+function updateConnStatus(status) {
+  if (status === "connected") {
+    connDot.classList.remove("off");
+    connText.textContent = "Connected";
+    /* tell phones that are already open that the screen is here */
+    channel.send({ type: "screen-ready" });
+  } else if (status === "failed") {
+    connDot.classList.add("off");
+    connText.textContent = "No connection";
+  } else {
+    connDot.classList.add("off");
+    connText.textContent = "Connecting…";
+  }
+}
+
+/* Re-announced regularly so a refreshed screen re-syncs quickly. */
 channel.send({ type: "screen-ready" });
 setInterval(function () {
   channel.send({ type: "screen-ready" });

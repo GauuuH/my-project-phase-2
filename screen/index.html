@@ -12,10 +12,10 @@
   <header class="topbar">
     <h1>DECIDER</h1>
     <div class="room">
-      <span class="dot"></span>
-      <span>Shared Main Screen</span>
+      <span class="dot" id="connDot"></span>
+      <span id="connText">Connecting…</span>
     </div>
-    <div class="room-code">Room: <b>LOCAL</b></div>
+    <div class="room-code">Room: <b id="roomCode">…</b></div>
   </header>
 
   <main class="stage-wrap">
@@ -37,6 +37,7 @@
 
   <footer class="players" id="players"></footer>
 
+  <script src="../js/vendor/mqtt.min.js"></script>
   <script src="../js/shared.js"></script>
   <script src="../js/screen.js"></script>
   <script src="../js/idle.js"></script>
