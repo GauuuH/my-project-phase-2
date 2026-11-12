@@ -124,17 +124,41 @@ body {
   user-select: none;
 }
 
-/* ---------- character test panel (development only) ---------- */
+/* ---------- character / item layers ---------- */
 
-.char-panel {
+/* Objects & Tools: independent layer shown near the character.
+ * Position and size are set by js/items.js (left/top = center point,
+ * height = % of game area height, width keeps the image aspect). */
+.item-layer {
+  position: absolute;
+  left: 56.5%;
+  top: 50%;
+  height: 10%;
+  width: auto;
+  transform: translate(-50%, -50%);
+  z-index: 4; /* above the character */
+  display: none;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* ---------- test panels (development only) ---------- */
+
+.test-panels {
   position: fixed;
   right: 14px;
   top: 50%;
   transform: translateY(-50%);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 10px;
   z-index: 20;
+}
+
+.char-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   padding: 10px;
   background: rgba(13, 19, 33, 0.85);
   border: 1px dashed var(--line);
@@ -156,6 +180,36 @@ body {
 }
 
 .char-btn.active {
+  border-color: var(--accent);
+  background: var(--panel-2);
+  color: var(--accent);
+}
+
+.item-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  background: rgba(13, 19, 33, 0.85);
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+}
+
+.item-panel-label {
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.item-btn {
+  font-size: 12px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: transparent;
+}
+
+.item-btn.active {
   border-color: var(--accent);
   background: var(--panel-2);
   color: var(--accent);

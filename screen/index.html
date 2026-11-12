@@ -33,6 +33,7 @@
         <div class="window-dim"></div>
       </div>
       <canvas id="character" class="character"></canvas>
+      <img id="item" class="item-layer" alt="Item or tool">
     </div>
 
     <div class="result">
@@ -48,15 +49,27 @@
 
   <footer class="players" id="players"></footer>
 
-  <div class="char-panel">
-    <span class="char-panel-label">CHAR TEST</span>
-    <button class="char-btn active" data-state="idle">Idle</button>
-    <button class="char-btn" data-state="walk">Walk</button>
-    <button class="char-btn" data-state="run">Run</button>
-    <button class="char-btn" data-state="jump">Jump</button>
-    <button class="char-btn" data-state="fall">Fall</button>
-    <button class="char-btn" data-state="wind">Blown by Wind</button>
-    <button class="char-btn" data-state="eat">Eat</button>
+  <div class="test-panels">
+    <div class="char-panel">
+      <span class="char-panel-label">CHAR TEST</span>
+      <button class="char-btn active" data-state="idle">Idle</button>
+      <button class="char-btn" data-state="walk">Walk</button>
+      <button class="char-btn" data-state="run">Run</button>
+      <button class="char-btn" data-state="jump">Jump</button>
+      <button class="char-btn" data-state="fall">Fall</button>
+      <button class="char-btn" data-state="wind">Blown by Wind</button>
+      <button class="char-btn" data-state="eat">Eat</button>
+    </div>
+    <div class="item-panel">
+      <span class="item-panel-label">ITEM TEST</span>
+      <button class="item-btn active" data-item="none">None</button>
+      <button class="item-btn" data-item="pizza">Pizza</button>
+      <button class="item-btn" data-item="football">Football</button>
+      <button class="item-btn" data-item="umbrella">Umbrella</button>
+      <button class="item-btn" data-item="hammer">Hammer</button>
+      <button class="item-btn" data-item="flashlight">Flashlight</button>
+      <button class="item-btn" data-item="phone">Phone</button>
+    </div>
   </div>
 
   <script src="../js/vendor/mqtt.min.js"></script>
@@ -64,5 +77,6 @@
   <script src="../js/screen.js"></script>
   <script src="../js/environment.js"></script>
   <script src="../js/animations.js"></script>
+  <script src="../js/items.js"></script>
 </body>
 </html>
