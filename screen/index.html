@@ -32,7 +32,7 @@
       <div class="window-fx" id="windowFx" aria-hidden="true">
         <div class="window-dim"></div>
       </div>
-      <img id="character" class="character" alt="Character idle animation">
+      <canvas id="character" class="character"></canvas>
     </div>
 
     <div class="result">
@@ -48,10 +48,21 @@
 
   <footer class="players" id="players"></footer>
 
+  <div class="char-panel">
+    <span class="char-panel-label">CHAR TEST</span>
+    <button class="char-btn active" data-state="idle">Idle</button>
+    <button class="char-btn" data-state="walk">Walk</button>
+    <button class="char-btn" data-state="run">Run</button>
+    <button class="char-btn" data-state="jump">Jump</button>
+    <button class="char-btn" data-state="fall">Fall</button>
+    <button class="char-btn" data-state="wind">Blown by Wind</button>
+    <button class="char-btn" data-state="eat">Eat</button>
+  </div>
+
   <script src="../js/vendor/mqtt.min.js"></script>
   <script src="../js/shared.js"></script>
   <script src="../js/screen.js"></script>
-  <script src="../js/idle.js"></script>
   <script src="../js/environment.js"></script>
+  <script src="../js/animations.js"></script>
 </body>
 </html>

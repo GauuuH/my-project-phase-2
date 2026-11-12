@@ -13,7 +13,11 @@ DECIDER 游戏 Phase 2 基础网页原型（对应 `PLAN.md` 的 Day 2–3，提
 ## 当前视觉效果
 
 - **背景**：`assets/room/Map.png`（像素风室内房间）铺满 Game Area，保持 16:9 原比例。
-- **角色**：独立图层站在房间中央木地板上（Idle 动画循环播放）。位置/大小可在 `css/screen.css` 的 `.character` 里调 `--char-height`（高度）和 `--char-floor-y`（脚底位置）。
+- **角色**：独立图层站在房间中央木地板上，7 个 Character State（Idle / Walk / Run / Jump / Fall / Blown by Wind / Eat），由 `js/animations.js` 统一管理。
+  - 所有动画都是单帧 PNG 序列；除 Idle 外，原始帧带不透明背景，**运行时用洪泛填充抠图**（不修改原始 PNG）。
+  - 每个动画有独立的 `fps`（在 `js/animations.js` 顶部 `ANIM_CONFIG`），并带校准数据，切换动画时角色的身体大小、脚底位置和中心位置保持一致。
+  - Walk / Run / Idle 循环播放；Jump / Fall / Blown by Wind / Eat 播放一遍后自动回到 Idle。
+  - **Character Test Panel**（页面右侧竖排按钮，开发测试用，之后会删除）可手动切换动画。
 - **Environment Test Panel**：顶栏三个按钮 ☀️ Sunny / 🌧️ Rain / ❄️ Snow，同一时间只有一种环境。
   - Sunny：地图本身的晴天 + 轻微暖光。
   - Rain / Snow：`js/environment.js` 代码生成的雨滴/雪花，只出现在背景大窗户区域内，窗外会稍微变暗，不会落到室内。数量、大小、速度在文件顶部 `ENV_CONFIG` 里调。
@@ -40,7 +44,7 @@ DECIDER 游戏 Phase 2 基础网页原型（对应 `PLAN.md` 的 Day 2–3，提
 ├── index.html                入口页
 ├── screen/index.html         Shared Main Screen（笔记本）
 ├── player/index.html         手机玩家页
-├── assets/idle/frames/       Idle 动画帧（008.png / 009.png）
+├── assets/char/<state>/frames/  7 个角色动画的帧序列
 ├── assets/room/Map.png       房间背景（16:9 像素画）
 ├── css/
 │   ├── base.css              共享基础样式
@@ -51,7 +55,7 @@ DECIDER 游戏 Phase 2 基础网页原型（对应 `PLAN.md` 的 Day 2–3，提
     ├── shared.js             共享数据 + 房间码 + MQTT 通信层
     ├── screen.js             主屏幕逻辑
     ├── player.js             玩家页逻辑
-    ├── idle.js               角色 Idle 动画（速度参数在顶部 IDLE_CONFIG）
+    ├── animations.js         角色动画系统（7 状态，fps 在顶部 ANIM_CONFIG）
     └── environment.js        Sunny/Rain/Snow 环境系统（参数在顶部 ENV_CONFIG）
 ```
 

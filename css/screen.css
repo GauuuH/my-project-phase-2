@@ -109,23 +109,56 @@ body {
   user-select: none;
 }
 
-/* Character: independent layer standing above the map.
- *   --char-height:  character height as % of game area height.
- *   --char-floor-y: where the feet touch the floor (% of map height).
- * The feet sit at 89.7% of the sprite height (732/816), so the sprite's
- * top is: floor-y - height * 0.897. Tune the two variables to adjust. */
+/* Character: independent layer standing above the map. It is a <canvas>
+ * that shows one animation frame at a time. Size and position are set by
+ * js/animations.js per state, so every animation keeps the same body
+ * size, feet position and center (defaults below = idle state). */
 .character {
-  --char-height: 28%;
-  --char-floor-y: 68%;
   position: absolute;
-  left: 50%;
-  top: calc(var(--char-floor-y) - var(--char-height) * 0.897);
-  height: var(--char-height);
-  width: auto; /* keep the sprite's own aspect ratio, no stretching */
-  transform: translateX(-50%);
+  left: 42.1%;
+  top: 42.9%;
+  height: 28%;
+  width: auto;
   z-index: 3;
   pointer-events: none;
   user-select: none;
+}
+
+/* ---------- character test panel (development only) ---------- */
+
+.char-panel {
+  position: fixed;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 20;
+  padding: 10px;
+  background: rgba(13, 19, 33, 0.85);
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+}
+
+.char-panel-label {
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.char-btn {
+  font-size: 12px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: transparent;
+}
+
+.char-btn.active {
+  border-color: var(--accent);
+  background: var(--panel-2);
+  color: var(--accent);
 }
 
 /* ---------- environment: sunny ---------- */
