@@ -229,6 +229,46 @@ body {
   color: var(--accent);
 }
 
+/* ---------- dev panel ---------- */
+
+.dev-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  background: rgba(13, 19, 33, 0.85);
+  border: 1px dashed #fbbf24;
+  border-radius: 12px;
+}
+
+.dev-panel-label {
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: #fbbf24;
+  text-align: center;
+}
+
+.dev-btn {
+  font-size: 12px;
+  padding: 7px 12px;
+  border-radius: 8px;
+  background: transparent;
+  color: #fbbf24;
+  border-color: #fbbf24;
+}
+
+.dev-btn:hover {
+  background: rgba(251, 191, 36, 0.12);
+}
+
+/* ---------- revealed command ---------- */
+
+.result-text.revealed {
+  color: var(--accent);
+  font-size: 26px;
+  text-shadow: 0 0 22px rgba(56, 225, 255, 0.45);
+}
+
 /* ---------- environment: sunny ---------- */
 
 .sun-overlay {

@@ -77,6 +77,11 @@ function actionById(id) {
   return DECIDER.ACTIONS.find(function (a) { return a.id === id; });
 }
 
+/* pick a random item from an array */
+function randomFrom(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
 /* ---------- room code ---------- */
 
 var ROOM_CHARSET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; /* no I, L, O, 0, 1 */
