@@ -8,7 +8,7 @@ DECIDER 游戏 Phase 2 基础网页原型（对应 `PLAN.md` 的 Day 2–3，提
 | --- | --- | --- |
 | 入口页 | `index.html` | 链接到下面两个页面 |
 | Shared Main Screen | `screen/index.html` | 笔记本上显示的共享主屏幕（生成房间码） |
-| 手机玩家页 | `player/index.html` | 真手机/平板：输入房间码、选角色、发动作 |
+| 手机玩家页 | `player/index.html` | 真手机/平板：输入房间码、选角色、测试五种真实交互 |
 
 ## 当前视觉效果
 
@@ -30,8 +30,14 @@ DECIDER 游戏 Phase 2 基础网页原型（对应 `PLAN.md` 的 Day 2–3，提
 
 1. 笔记本用 Chrome/Edge 打开 `screen/index.html`（本地双击，或 Pages 上的链接均可）。
 2. 记住主屏幕右上角的 **4 位房间码**（如 `KX7P`）。
-3. 手机上打开玩家页 `player/index.html`：输入房间码 → 选角色 → 输入名字 → **Join the game** → 点击动作（💨 Blow / 📳 Shake / 👆 Press / 📐 Tilt）。
-4. 主屏幕实时更新：角色卡显示玩家、中间角色播放对应效果、五个角色都用过动作后显示组合结果。
+3. 手机上打开玩家页 `player/index.html`：输入房间码 → 选角色 → 输入名字 → **Join the game**。
+4. 加入后可在同一台手机上逐个选择并测试五种真实交互（`js/interactions.js`，阈值在顶部 `INTER_CONFIG`）：
+   - 💨 **Blow**：对着麦克风吹气（Web Audio）
+   - 📳 **Shake**：真实摇晃手机（DeviceMotion）
+   - 👆 **Press & Hold**：按住屏幕约 1.5 秒
+   - 📐 **Tilt**：倾斜手机（DeviceOrientation）
+   - 👋 **Swipe**：向任意方向快速滑动
+   检测成功后手机端只显示结果和 Completed/Ready 状态，暂不触发笔记本上的反馈。
 
 > 联机要求：笔记本和手机都要能上网（消息经公共 MQTT 服务器中转）。房间码保存在本地，下次打开还会沿用同一个码。
 
@@ -59,7 +65,8 @@ DECIDER 游戏 Phase 2 基础网页原型（对应 `PLAN.md` 的 Day 2–3，提
     ├── vendor/mqtt.min.js    MQTT 客户端库（本地）
     ├── shared.js             共享数据 + 房间码 + MQTT 通信层
     ├── screen.js             主屏幕逻辑
-    ├── player.js             玩家页逻辑
+    ├── player.js             玩家页逻辑（加入/心跳/离开）
+    ├── interactions.js       五种真实手机交互（阈值在顶部 INTER_CONFIG）
     ├── animations.js         角色动画系统（7 状态，fps 在顶部 ANIM_CONFIG）
     ├── items.js              Objects & Tools 图层（位置/大小在顶部 ITEM_CONFIG）
     └── environment.js        Sunny/Rain/Snow 环境系统（参数在顶部 ENV_CONFIG）
