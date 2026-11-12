@@ -14,8 +14,10 @@
  * ================================================================ */
 
 var IDLE_CONFIG = {
-  /* Folder that contains the single-frame PNGs. */
-  folder: "assets/idle/frames/",
+  /* Folder that contains the single-frame PNGs.
+   * This path is relative to the PAGE (screen/index.html),
+   * so it starts with ../ to go up to the project root. */
+  folder: "../assets/idle/frames/",
 
   /* Which frames to use (without ".png"). Played in number order.
    * To use more frames later, just add them here. */
