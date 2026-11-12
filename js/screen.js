@@ -73,13 +73,41 @@ function handleMessage(msg) {
   if (!msg || !msg.type) return;
 
   switch (msg.type) {
-    case "player-join":
+    case "player-join": {
+      var joinNow = Date.now();
+
+      /* Occupancy enforcement: ONE online player per role. If another
+       * (different) online player already owns this role, reject the
+       * newcomer - the first accepted player keeps the role, nobody
+       * overwrites anybody, even with two simultaneous JOINs. */
+      var owner = null;
+      state.players.forEach(function (p) {
+        if (p.id !== msg.player.id && p.roleId === msg.player.roleId &&
+            joinNow - p.lastSeen < OFFLINE_AFTER_MS) {
+          owner = p;
+        }
+      });
+
+      if (owner) {
+        var oRole = roleById(msg.player.roleId);
+        channel.send({
+          type: "join-rejected",
+          playerId: msg.player.id,
+          reason: "role-occupied",
+          roleId: msg.player.roleId,
+        });
+        pushEvent("⛔ " + esc(msg.player.name) + " — " +
+          (oRole ? oRole.name : "role") + " already occupied");
+        broadcastStageState();
+        break;
+      }
+
       var existed = state.players.has(msg.player.id);
       state.players.set(msg.player.id, {
         id: msg.player.id,
         name: msg.player.name,
         roleId: msg.player.roleId,
-        lastSeen: Date.now(),
+        lastSeen: joinNow,
       });
       if (!existed) {
         var role = roleById(msg.player.roleId);
@@ -89,6 +117,7 @@ function handleMessage(msg) {
       /* sync the joiner (and everyone else) with the current stage */
       broadcastStageState();
       break;
+    }
 
     /* a phone finished its interaction and submitted its result.
      * Sequential flow: only the role at the current stage may submit
@@ -123,6 +152,9 @@ function handleMessage(msg) {
       if (lp) {
         state.players.delete(msg.playerId);
         pushEvent(esc(lp.name) + " left");
+        /* the role is free again (1/1 -> 0/1): update every phone's
+         * role selection immediately, no refresh needed */
+        broadcastStageState();
       }
       break;
     }
@@ -156,9 +188,11 @@ function advanceStage() {
 function broadcastStageState() {
   var now = Date.now();
   var occupied = [];
+  var owners = {}; /* roleId -> online playerId (who owns the role) */
   state.players.forEach(function (p) {
-    if (now - p.lastSeen < OFFLINE_AFTER_MS && occupied.indexOf(p.roleId) < 0) {
-      occupied.push(p.roleId);
+    if (now - p.lastSeen < OFFLINE_AFTER_MS) {
+      owners[p.roleId] = p.id;
+      if (occupied.indexOf(p.roleId) < 0) occupied.push(p.roleId);
     }
   });
 
@@ -167,6 +201,7 @@ function broadcastStageState() {
     currentStage: state.currentStage,
     done: Array.from(state.results.keys()),
     occupied: occupied,
+    owners: owners,
     actionPool: null,
     itemPool: null,
   };
@@ -203,7 +238,9 @@ function renderPlayers() {
   var now = Date.now();
 
   DECIDER.ROLES.forEach(function (role) {
-    /* one player per role: the last player who joined this role wins */
+    /* one accepted online player per role: the laptop enforces this on
+     * player-join (rejects anyone who tries an occupied role), so each
+     * card always maps to the role's unique owner */
     var player = null;
     state.players.forEach(function (p) {
       if (p.roleId === role.id) player = p;

@@ -32,7 +32,7 @@ DECIDER 游戏 Phase 2 基础网页原型（对应 `PLAN.md` 的 Day 2–3，提
 1. 笔记本用 Chrome/Edge 打开 `screen/index.html`（本地双击，或 Pages 上的链接均可）。
 2. 记住主屏幕右上角的 **4 位房间码**（如 `KX7P`）。
 3. 手机上打开玩家页 `player/index.html`：输入房间码 → 选角色 → 输入名字 → **Join the game**。
-   - 输入房间码后手机就会**预先监听房间**（Laptop 通过 `screen-ping` / `stage-state` 回复），角色选择区会实时显示哪些 Role 已被占用：已占用的按钮变暗并带 **1/1** 角标（一个角色同一时间只有一个玩家），新玩家应选择空闲角色。
+   - **角色占用强制规则（一个 Role = 一个在线玩家）**：输入房间码后手机就会**预先监听房间**（Laptop 通过 `screen-ping` / `stage-state` 回复），每个 Role 按钮始终显示 **0/1（空闲）** 或 **1/1（已占用）**：占用的按钮变暗、不可点击、无法选中，JOIN 按钮也会自动禁用。若两台手机同时抢同一个 Role，Laptop 仲裁：先被接受的玩家拥有该 Role，第二台手机收到 `join-rejected` 并自动回到 Role Selection（提示 "This role is already occupied. Please choose another role."）。已占用玩家 Leave 后，该 Role 自动恢复 0/1，所有手机无需刷新即可看到。
 4. 加入后**不会立刻启动交互**——本轮是**顺序依赖流程**（`js/shared.js` 里 `DECIDER.STAGE_ORDER`，顺序固定为 Environment → Direction → Action → Item）：
    | Role | Interaction |
    | --- | --- |
@@ -62,7 +62,7 @@ DECIDER 游戏 Phase 2 基础网页原型（对应 `PLAN.md` 的 Day 2–3，提
 - **跨设备通信**：MQTT over WebSocket，使用公共服务器 `broker.emqx.io`（备用 `broker.hivemq.com`），客户端库 `js/vendor/mqtt.min.js` 已下载到项目里，不依赖任何 CDN，无需注册、无需自己部署服务器。
 - **隐私提醒**：公共服务器上任何知道房间码的人都能收发该房间的消息。原型阶段可以接受；正式版（Day 4 后续）换成自己的服务器时，只需改 `js/shared.js` 一个文件。
 - **Idle 动画**：`js/idle.js` 顶部 `IDLE_CONFIG` 可调整速度（`fps`，当前 6）和帧列表；帧图片在 `assets/idle/frames/`，路径相对 `screen/index.html` 页面。
-- 四个角色（Environment / Action / Item / Direction），每个角色同一时间只有一个玩家（后加入的覆盖先加入的）；原 Object + Tool 已合并为 Item，Swipe 从 Tool 改为 Direction。
+- 四个角色（Environment / Action / Item / Direction），每个角色同一时间只有一个在线玩家（Laptop 在 player-join 时强制仲裁，后加入的会被 join-rejected 拒绝，不再覆盖先加入的）；原 Object + Tool 已合并为 Item，Swipe 从 Tool 改为 Direction。
 
 ## 项目结构
 

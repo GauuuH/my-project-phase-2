@@ -23,6 +23,7 @@ var youStatus = document.getElementById("youStatus");
 var leaveBtn = document.getElementById("leaveBtn");
 var interBinding = document.getElementById("interBinding");
 var stageBanner = document.getElementById("stageBanner");
+var joinError = document.getElementById("joinError");
 
 var selectedRoleId = null;
 var joined = false;
@@ -58,29 +59,60 @@ DECIDER.ROLES.forEach(function (role) {
     '<span class="icon">' + role.icon + '</span>' +
     '<span>' + role.name + '</span>' +
     '<span class="ctrl">' + role.controller + '</span>' +
-    '<span class="role-count" hidden>1/1</span>';
+    '<span class="role-count">0/1</span>';
   btn.onclick = function () {
+    /* occupied roles are disabled - clicking does nothing */
+    if (btn.disabled || isRoleOccupied(role.id)) return;
     var all = roleGrid.querySelectorAll(".role-btn");
     for (var i = 0; i < all.length; i++) all[i].classList.remove("selected");
     btn.classList.add("selected");
     selectedRoleId = role.id;
+    hideJoinError();
     updateJoinBtn();
   };
   roleGrid.appendChild(btn);
 });
 
+/* current occupancy (from the laptop via stage-state) */
+var occupiedRoles = [];
+
+function isRoleOccupied(roleId) {
+  return occupiedRoles.indexOf(roleId) >= 0;
+}
+
 /* Mark roles that already have a player in the room (laptop keeps the
- * truth - one player per role). Occupied buttons get the 1/1 badge
- * and a dimmed look so new joiners can pick a free role. */
+ * truth - one player per role). Every role always shows its count:
+ * 0/1 = free / 1/1 = occupied. Occupied roles are dimmed, disabled
+ * and cannot be selected; if the selected role gets taken by another
+ * player, the selection is cleared automatically. */
 function updateRoleOccupancy(occupied) {
-  var list = occupied || [];
+  occupiedRoles = occupied || [];
   var btns = roleGrid.querySelectorAll(".role-btn");
   for (var i = 0; i < btns.length; i++) {
-    var occ = list.indexOf(btns[i].getAttribute("data-role")) >= 0;
+    var occ = isRoleOccupied(btns[i].getAttribute("data-role"));
     btns[i].classList.toggle("occupied", occ);
+    btns[i].disabled = occ; /* clicks on occupied roles do nothing */
     var badge = btns[i].querySelector(".role-count");
-    if (badge) badge.hidden = !occ;
+    if (badge) badge.textContent = occ ? "1/1" : "0/1";
   }
+
+  /* someone else grabbed the selected role before JOIN: force deselect */
+  if (selectedRoleId && isRoleOccupied(selectedRoleId)) {
+    for (var j = 0; j < btns.length; j++) {
+      if (btns[j].getAttribute("data-role") === selectedRoleId) {
+        btns[j].classList.remove("selected");
+      }
+    }
+    selectedRoleId = null;
+    updateJoinBtn();
+  }
+}
+
+function clearRoleSelection() {
+  var all = roleGrid.querySelectorAll(".role-btn");
+  for (var i = 0; i < all.length; i++) all[i].classList.remove("selected");
+  selectedRoleId = null;
+  updateJoinBtn();
 }
 
 /* ---------- room status listener (before joining) ---------- */
@@ -125,11 +157,14 @@ function scheduleRoomListener() {
 
 /* ---------- join / leave ---------- */
 
+/* JOIN needs: a role selected, a name, a room code, AND the selected
+ * role must still be free (not occupied by another player). */
 function updateJoinBtn() {
   joinBtn.disabled = !(
     selectedRoleId &&
     nameInput.value.trim() &&
-    normalizeRoomCode(roomInput.value)
+    normalizeRoomCode(roomInput.value) &&
+    !isRoleOccupied(selectedRoleId)
   );
 }
 
@@ -143,6 +178,8 @@ joinBtn.onclick = function () {
   var name = nameInput.value.trim();
   var room = normalizeRoomCode(roomInput.value);
   if (!selectedRoleId || !name || !room) return;
+  /* never JOIN an occupied role (the laptop re-validates anyway) */
+  if (isRoleOccupied(selectedRoleId)) return;
 
   saveRoomCode(room);
   joined = true;
@@ -198,6 +235,16 @@ leaveBtn.onclick = function () {
   updateRoleOccupancy([]);
   scheduleRoomListener();
 };
+
+function showJoinError(text) {
+  if (!joinError) return;
+  joinError.textContent = text;
+  joinError.hidden = false;
+}
+
+function hideJoinError() {
+  if (joinError) joinError.hidden = true;
+}
 
 function announceJoin() {
   channel.send({
@@ -259,13 +306,60 @@ function handleMessage(msg) {
     announceJoin();
   }
   if (msg.type === "stage-state" && joined) {
+    /* hard self-check: if the laptop says another player owns my role,
+     * my join was rejected (covers a lost join-rejected message too) */
+    if (msg.owners && msg.owners[selectedRoleId] && msg.owners[selectedRoleId] !== playerId) {
+      handleJoinRejected({ reason: "role-occupied" });
+      return;
+    }
     applyStageState(msg);
+  }
+  if (msg.type === "join-rejected" && joined && msg.playerId === playerId) {
+    handleJoinRejected(msg);
   }
   if (msg.type === "round-reset" && joined) {
     /* new round: the laptop sends the new stage (Environment starts).
      * Force a full re-apply even if the signature looks the same. */
     lastStageSignature = null;
     applyStageState({ currentStage: msg.currentStage || "environment", done: [] });
+  }
+}
+
+/* The laptop rejected our join (someone else owns this role, even if
+ * two phones JOINed at the same time). Tear the session down, go back
+ * to the role selection with fresh occupancy and tell the player to
+ * pick another role. No interaction is ever started. */
+function handleJoinRejected(msg) {
+  clearInterval(heartbeat);
+  heartbeat = null;
+  if (channel) {
+    channel.close();
+    channel = null;
+  }
+  joined = false;
+  currentStage = null;
+  lastStageSignature = null;
+  connState = null;
+  if (typeof stopAllInteractions === "function") stopAllInteractions();
+  if (typeof setRolePool === "function") {
+    setRolePool("action", null);
+    setRolePool("item", null);
+  }
+  interBinding.textContent = "";
+  hideBanner();
+
+  /* back to the role selection page, no selection left */
+  clearRoleSelection();
+  actionSection.hidden = true;
+  joinSection.hidden = false;
+  setYouStatus("warn", "● Not joined — back to role selection");
+
+  /* refresh occupancy (1/1 for the taken role) via the listen channel */
+  updateRoleOccupancy([]);
+  scheduleRoomListener();
+
+  if (msg.reason === "role-occupied") {
+    showJoinError("This role is already occupied. Please choose another role.");
   }
 }
 

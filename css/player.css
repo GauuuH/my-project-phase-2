@@ -67,19 +67,22 @@ h2 {
   font-weight: 600;
 }
 
-/* occupied role: dimmed color block + 1/1 badge (one player per role) */
+/* occupied role: dark, clearly unavailable (the name stays readable) */
 .role-btn.occupied {
   border-color: #fbbf24;
   background: rgba(251, 191, 36, 0.10);
   color: var(--muted);
-  opacity: 0.75;
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
 .role-btn.occupied .icon {
-  filter: grayscale(0.6);
-  opacity: 0.7;
+  filter: grayscale(0.7);
+  opacity: 0.65;
 }
 
+/* 0/1 (free) / 1/1 (occupied) count chip - always visible on every
+ * role, so occupancy never relies on color alone */
 .role-count {
   position: absolute;
   top: 5px;
@@ -87,11 +90,34 @@ h2 {
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.5px;
-  color: #0a0e17;
-  background: #fbbf24;
+  color: var(--muted);
+  background: var(--bg);
+  border: 1px solid var(--line);
   border-radius: 8px;
   padding: 1px 6px;
+}
+
+.role-btn.occupied .role-count {
+  color: #0a0e17;
+  background: #fbbf24;
+  border-color: #fbbf24;
   box-shadow: 0 0 8px -2px #fbbf24;
+}
+
+/* rejected join message */
+.join-error {
+  font-size: 12px;
+  font-weight: 600;
+  color: #f87171;
+  text-align: center;
+  background: rgba(248, 113, 113, 0.08);
+  border: 1px solid #7f1d1d;
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+
+.join-error[hidden] {
+  display: none;
 }
 
 .role-btn .icon {
