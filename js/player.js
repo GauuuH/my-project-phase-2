@@ -1,4 +1,11 @@
-/* DECIDER - phone player page logic */
+/* DECIDER - phone player page logic
+ *
+ * Join flow (role / name / room) stays the same. After joining, the
+ * Interaction Test section (see js/interactions.js) lets the player
+ * test the five real phone interactions. Interactions currently only
+ * show their result on the phone - they do NOT send anything to the
+ * laptop yet.
+ */
 
 var roleGrid = document.getElementById("roleGrid");
 var nameInput = document.getElementById("nameInput");
@@ -6,13 +13,11 @@ var roomInput = document.getElementById("roomInput");
 var joinBtn = document.getElementById("joinBtn");
 var joinSection = document.getElementById("joinSection");
 var actionSection = document.getElementById("actionSection");
-var actionGrid = document.getElementById("actionGrid");
 var youIcon = document.getElementById("youIcon");
 var youName = document.getElementById("youName");
 var youRole = document.getElementById("youRole");
 var youRoom = document.getElementById("youRoom");
 var youStatus = document.getElementById("youStatus");
-var lastAction = document.getElementById("lastAction");
 var leaveBtn = document.getElementById("leaveBtn");
 
 var selectedRoleId = null;
@@ -33,7 +38,7 @@ var channel = null;
   }
 })();
 
-/* ---------- build UI ---------- */
+/* ---------- build UI: role picker ---------- */
 
 DECIDER.ROLES.forEach(function (role) {
   var btn = document.createElement("button");
@@ -51,19 +56,6 @@ DECIDER.ROLES.forEach(function (role) {
     updateJoinBtn();
   };
   roleGrid.appendChild(btn);
-});
-
-DECIDER.ACTIONS.forEach(function (action) {
-  var btn = document.createElement("button");
-  btn.className = "action-btn";
-  btn.innerHTML =
-    '<span class="icon">' + action.icon + '</span>' +
-    '<span>' + action.name + '</span>';
-  btn.onclick = function () {
-    channel.send({ type: "player-action", playerId: playerId, actionId: action.id });
-    lastAction.textContent = "You used " + action.name + "!";
-  };
-  actionGrid.appendChild(btn);
 });
 
 /* ---------- join / leave ---------- */
@@ -104,7 +96,6 @@ joinBtn.onclick = function () {
 
   joinSection.hidden = true;
   actionSection.hidden = false;
-  lastAction.textContent = "";
 };
 
 leaveBtn.onclick = function () {
@@ -114,9 +105,9 @@ leaveBtn.onclick = function () {
   channel.close();
   channel = null;
   joined = false;
+  if (typeof stopAllInteractions === "function") stopAllInteractions();
   actionSection.hidden = true;
   joinSection.hidden = false;
-  lastAction.textContent = "";
 };
 
 function announceJoin() {

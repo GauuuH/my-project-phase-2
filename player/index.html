@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>DECIDER · Player</title>
   <link rel="stylesheet" href="../css/base.css">
   <link rel="stylesheet" href="../css/player.css">
@@ -39,14 +39,28 @@
       </div>
       <p class="you-status" id="youStatus"></p>
 
-      <h2>Your actions</h2>
-      <div class="action-grid" id="actionGrid"></div>
-      <p class="last-action" id="lastAction"></p>
+      <h2>Interaction test</h2>
+      <div class="inter-select" id="interSelect">
+        <button class="inter-btn" data-inter="blow">💨 Blow</button>
+        <button class="inter-btn" data-inter="shake">📳 Shake</button>
+        <button class="inter-btn" data-inter="press">👆 Press &amp; Hold</button>
+        <button class="inter-btn" data-inter="tilt">📐 Tilt</button>
+        <button class="inter-btn" data-inter="swipe">👋 Swipe</button>
+      </div>
+
+      <div class="inter-stage" id="interStage"></div>
+
+      <div class="inter-status" id="interStatus">
+        <span class="inter-dot" id="interDot"></span>
+        <span id="interStatusText">Select an interaction</span>
+      </div>
+      <div class="inter-result" id="interResult"></div>
     </section>
   </main>
 
   <script src="../js/vendor/mqtt.min.js"></script>
   <script src="../js/shared.js"></script>
   <script src="../js/player.js"></script>
+  <script src="../js/interactions.js"></script>
 </body>
 </html>
