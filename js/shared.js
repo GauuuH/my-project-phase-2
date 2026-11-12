@@ -10,6 +10,7 @@
  *   { type: "player-heartbeat", playerId }
  *   { type: "player-leave",     playerId }
  *   { type: "screen-ready" }
+ *   { type: "round-reset" }  (laptop -> phones: re-arm for a new round)
  *
  * NOTE: the broker is public, so anyone who knows the room code can read
  * or send game messages. Fine for a prototype. Later (own server) this
@@ -26,44 +27,43 @@ var DECIDER = {
   ROOM_KEY: "decider-room",      /* localStorage key for the room code */
   PLAYER_ID_KEY: "decider-player-id",
 
-  /* Five player roles (placeholders - Day 1 will finalize the real rules).
-   * Each role controls one part of the world:
-   * Environment, Movement, Action, Object, Tool.
-   */
+  /* Four player roles. Each role controls one part of the world:
+   * Environment, Action, Object, Tool.
+   * (The old Movement role was merged into Action: Action now also
+   * covers Walk / Run / Jump / Fall next to Eat.) */
   ROLES: [
     { id: "environment", name: "Environment", controller: "The Architect", icon: "🌍", color: "#2dd4bf" },
-    { id: "movement",    name: "Movement",    controller: "The Navigator", icon: "🧭", color: "#f472b6" },
     { id: "action",      name: "Action",      controller: "The Operator",  icon: "⚡", color: "#fbbf24" },
     { id: "object",      name: "Object",      controller: "The Collector", icon: "📦", color: "#60a5fa" },
     { id: "tool",        name: "Tool",        controller: "The Engineer",  icon: "🔧", color: "#a78bfa" },
   ],
 
-  /* Simple physical interactions (Blow and Shake are the Day 2-3 test ones). */
+  /* Physical interactions. Press & Hold is kept as a dev/test
+   * interaction only - it is NOT bound to any role here and does not
+   * participate in a round. */
   ACTIONS: [
     { id: "blow",  name: "Blow",  icon: "💨" },
     { id: "shake", name: "Shake", icon: "📳" },
     { id: "press", name: "Press", icon: "👆" },
     { id: "tilt",  name: "Tilt",  icon: "📐" },
+    { id: "swipe", name: "Swipe", icon: "👋" },
   ],
 
-  /* Role -> real phone interaction binding (dev):
-   * Environment = Blow, Movement = Shake, Action = Press & Hold,
-   * Object = Tilt, Tool = Swipe. */
+  /* Role -> real phone interaction binding:
+   * Environment = Blow, Action = Shake, Object = Tilt, Tool = Swipe. */
   ROLE_INTERACTION: {
     environment: "blow",
-    movement: "shake",
-    action: "press",
+    action: "shake",
     object: "tilt",
     tool: "swipe",
   },
 
-  /* Random game result pool for each role (dev). The interaction is
+  /* Random game result pool for each role. The interaction is
    * only the input: e.g. a successful Blow randomly gives Sunny,
    * Rain or Snow. */
   ROLE_RESULTS: {
     environment: ["Sunny", "Rain", "Snow"],
-    movement: ["Walk", "Run", "Jump", "Fall"],
-    action: ["Eat", "Hit", "Use"],
+    action: ["Walk", "Run", "Jump", "Fall", "Eat"],
     object: ["Pizza", "Football"],
     tool: ["Umbrella", "Hammer", "Flashlight", "Phone"],
   },

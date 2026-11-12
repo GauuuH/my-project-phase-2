@@ -1,10 +1,10 @@
 /* DECIDER - phone player page logic
  *
  * Join flow (role / name / room) stays the same. After joining, the
- * Interaction Test section (see js/interactions.js) lets the player
- * test the five real phone interactions. Interactions currently only
- * show their result on the phone - they do NOT send anything to the
- * laptop yet.
+ * player's own role interaction (see js/interactions.js) auto-starts;
+ * a detected interaction generates this role's result and sends it to
+ * the laptop once. When the laptop starts a new round it broadcasts
+ * "round-reset" and this page re-arms the role interaction.
  */
 
 var roleGrid = document.getElementById("roleGrid");
@@ -182,5 +182,20 @@ function handleMessage(msg) {
   if (!msg) return;
   if (msg.type === "screen-ready" && joined) {
     announceJoin();
+  }
+  if (msg.type === "round-reset" && joined) {
+    resetForNextRound();
+  }
+}
+
+/* The laptop started a new round: clear the previous Result/READY
+ * state (locks included) and immediately re-arm this player's own
+ * role interaction, so the next round starts without leaving or
+ * refreshing the page. */
+function resetForNextRound() {
+  if (typeof stopAllInteractions === "function") stopAllInteractions();
+  var interId = DECIDER.ROLE_INTERACTION[selectedRoleId];
+  if (interId && typeof selectInteraction === "function") {
+    selectInteraction(interId);
   }
 }

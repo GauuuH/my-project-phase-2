@@ -8,7 +8,7 @@ DECIDER 游戏 Phase 2 基础网页原型（对应 `PLAN.md` 的 Day 2–3，提
 | --- | --- | --- |
 | 入口页 | `index.html` | 链接到下面两个页面 |
 | Shared Main Screen | `screen/index.html` | 笔记本上显示的共享主屏幕（生成房间码） |
-| 手机玩家页 | `player/index.html` | 真手机/平板：输入房间码、选角色、测试五种真实交互 |
+| 手机玩家页 | `player/index.html` | 真手机/平板：输入房间码、选角色、测试真实交互 |
 
 ## 当前视觉效果
 
@@ -34,25 +34,25 @@ DECIDER 游戏 Phase 2 基础网页原型（对应 `PLAN.md` 的 Day 2–3，提
 4. 加入后**自动启动该角色绑定的交互**（`js/shared.js` 里 `DECIDER.ROLE_INTERACTION`，开发绑定）：
    | Role | Interaction |
    | --- | --- |
-   | 🌍 Environment | 💨 Blow（麦克风吹气，**自适应噪声阈值**：启动先采样环境噪声 ~700ms，触发阈值 = max(噪声 × 2.5, 0.02)，吹气需明显高于阈值并持续 ~150ms；界面上实时显示 RMS / noise / threshold 便于调试） |
-   | 🧭 Movement | 📳 Shake（DeviceMotion 摇晃） |
-   | ⚡ Action | 👆 Press & Hold（按住约 1.5 秒） |
+   | 🌍 Environment | 💨 Blow（麦克风吹气，p5.AudioIn + p5.Amplitude，`amplitude.getLevel() > 0.05` 判定吹气成功） |
+   | ⚡ Action | 📳 Shake（DeviceMotion 摇晃） |
    | 📦 Object | 📐 Tilt（DeviceOrientation 倾斜） |
    | 🔧 Tool | 👋 Swipe（快速滑动） |
-   页面下方保留 **Manual test (dev)** 五个按钮，可手动切换测试。检测成功后随机生成该 Role 的一个结果（结果池在 `DECIDER.ROLE_RESULTS`）：
+   Press & Hold（👆）保留在页面上但**不绑定任何 Role**，仅作 dev/test 交互，不产生游戏结果、不参与本轮。页面下方保留 **Manual test (dev)** 按钮，可手动切换测试。检测成功后随机生成该 Role 的一个结果（结果池在 `DECIDER.ROLE_RESULTS`）：
    - Environment：Sunny / Rain / Snow
-   - Movement：Walk / Run / Jump / Fall
-   - Action：Eat / Hit / Use
+   - Action：Walk / Run / Jump / Fall / Eat（原 Movement 与 Action 合并）
    - Object：Pizza / Football
    - Tool：Umbrella / Hammer / Flashlight / Phone
    结果生成后保持显示，交互同时锁定（点 ⟳ Try again 解锁重试），暂不触发笔记本上的反馈。阈值在 `js/interactions.js` 顶部 `INTER_CONFIG`。
 5. 玩家完成自己 Role 的交互得到结果后，手机立即通过 MQTT 向房间发送 `player-result`（playerId / roleId / result），手机进入 **READY — result sent**，本轮不可重复提交（手动测试其他 Role 的交互只在本机显示，不会提交）。
-6. 笔记本收到结果后**只按 Role 秘密保存**（不显示具体选择、不触发任何环境/角色/道具反馈）；五个 Role Card 中已提交的显示 **● READY**，未提交的显示 WAITING/online；主状态显示 **X / 5 READY**（1–2 台手机也能正常测试）。
-7. **Combine & Command Reveal**：当五个 Role 的结果全部收到（`state.results.size === 5`）时，主屏幕一次性读取五个结果并 Reveal 完整 Command，例如：
-   - `Rain · Run · Eat · Pizza · Umbrella`
-   - `Run in the rain while eating pizza with an umbrella.`
-   5/5 之前只显示 READY 计数，绝不泄露具体结果，也不触发角色/环境/道具。目前 Reveal 只显示文字，不执行动画、不切换环境。
-   - **DEV: Fill Missing Roles** 按钮（右侧 DEV 面板）：只为尚未 READY 的 Role 随机补测试结果（真实手机提交的结果不会被覆盖），补足 5/5 后走同一套 Combine → Reveal 流程。仅开发测试用。
+6. 笔记本收到结果后**只按 Role 秘密保存**（不显示具体选择、不触发任何环境/角色/道具反馈）；四个 Role Card 中已提交的显示 **● READY**，未提交的显示 WAITING/online；主状态显示 **X / 4 READY**（1–2 台手机也能正常测试）。
+7. **Combine & Command Reveal + Execute**：当四个 Role 的结果全部收到（`state.results.size === DECIDER.ROLES.length`）时，主屏幕一次性读取四个结果，Reveal 完整 Command 并**执行一次**（`js/screen.js` 的 `executeCommand`），例如：
+   - `Rain · Run · Pizza · Umbrella`
+   - `Run in the rain with a pizza and an umbrella.`
+   执行直接复用现有系统：Environment → `setEnvironment()`，Action → `playCharacterState()`，Object/Tool → `showItem()`。顺序为：先切环境，同时播角色动画，先显示 Object，约 2.5 秒后换显示 Tool（Item 系统一次只显示一个）。每轮只执行一次（不受每秒 render() 影响）。
+   4/4 之前只显示 READY 计数，绝不泄露具体结果，也不触发角色/环境/道具。
+   - **DEV: Fill Missing Roles** 按钮（右侧 DEV 面板）：只为尚未 READY 的四个 Role 随机补测试结果（真实手机提交的结果不会被覆盖），补足 4/4 后走同一套 Combine → Reveal → Execute 流程。仅开发测试用。
+8. **NEXT ROUND**：Reveal 后主屏幕出现 **NEXT ROUND →** 按钮。点击后开始新一轮：清空 `state.results`、`combined = false`、取消未完成的 Item 切换计时器，Character 回 Idle、Environment 回 Sunny、Item 回 None、四个 Role Card 回到已加入但未 READY、主状态回到 `0 / 4 READY`；同时通过 MQTT 向房间广播 `round-reset`，每台已加入的手机收到后自动清除上一轮 Result/READY 状态并重新启动自己 Role 的交互，四个玩家无需退出或刷新即可直接开始第二轮。
 
 > 联机要求：笔记本和手机都要能上网（消息经公共 MQTT 服务器中转）。房间码保存在本地，下次打开还会沿用同一个码。
 
@@ -61,7 +61,7 @@ DECIDER 游戏 Phase 2 基础网页原型（对应 `PLAN.md` 的 Day 2–3，提
 - **跨设备通信**：MQTT over WebSocket，使用公共服务器 `broker.emqx.io`（备用 `broker.hivemq.com`），客户端库 `js/vendor/mqtt.min.js` 已下载到项目里，不依赖任何 CDN，无需注册、无需自己部署服务器。
 - **隐私提醒**：公共服务器上任何知道房间码的人都能收发该房间的消息。原型阶段可以接受；正式版（Day 4 后续）换成自己的服务器时，只需改 `js/shared.js` 一个文件。
 - **Idle 动画**：`js/idle.js` 顶部 `IDLE_CONFIG` 可调整速度（`fps`，当前 6）和帧列表；帧图片在 `assets/idle/frames/`，路径相对 `screen/index.html` 页面。
-- 五个角色（Environment / Movement / Action / Object / Tool）是占位设计，Day 1 确定最终规则后替换；每个角色同一时间只有一个玩家（后加入的覆盖先加入的）。
+- 四个角色（Environment / Action / Object / Tool），每个角色同一时间只有一个玩家（后加入的覆盖先加入的）；原 Movement 角色已并入 Action。
 
 ## 项目结构
 

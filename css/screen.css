@@ -423,6 +423,24 @@ body {
   min-height: 1.2em;
 }
 
+.next-round-btn {
+  align-self: center;
+  margin-top: 4px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  padding: 9px 26px;
+  border-radius: 10px;
+  border-color: var(--accent);
+  background: transparent;
+  color: var(--accent);
+}
+
+.next-round-btn:hover {
+  background: var(--panel-2);
+  box-shadow: 0 0 18px -6px var(--accent);
+}
+
 /* ---------- event log ---------- */
 
 .event-log {
@@ -452,7 +470,7 @@ body {
 
 .players {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 12px;
   padding: 12px 20px 18px;
   border-top: 1px solid var(--line);

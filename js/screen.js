@@ -4,8 +4,11 @@
  *  - player-join / player-leave / player-heartbeat: role card state
  *  - player-result: stores the submitted result PER ROLE (secret -
  *    never shown) and marks that role READY. No environment /
- *    character / item feedback is triggered yet.
- * The main status shows how many roles are READY, e.g. "2 / 5 READY".
+ *    character / item feedback is triggered before 4/4.
+ * The main status shows how many roles are READY, e.g. "2 / 4 READY".
+ * At 4/4 the four results are combined, the command is revealed AND
+ * executed once (environment + character + items). The NEXT ROUND
+ * button then resets the round and re-arms every phone.
  * Works with any number of players (1-2 phones are enough to test).
  */
 
@@ -13,10 +16,13 @@ var OFFLINE_AFTER_MS = 4000;
 
 var state = {
   players: new Map(),   /* id -> { id, name, roleId, lastSeen } */
-  results: new Map(),   /* roleId -> result (stored secretly until 5/5) */
+  results: new Map(),   /* roleId -> result (stored secretly until 4/4) */
   events: [],           /* recent log lines, newest first */
-  combined: false,      /* true once the 5/5 command was revealed */
+  combined: false,      /* true once the 4/4 command was revealed */
 };
+
+var nextRoundBtn = document.getElementById("nextRoundBtn");
+var commandTimer = null; /* pending Object -> Tool item swap of this round */
 
 var world = document.getElementById("world");
 var resultText = document.getElementById("resultText");
@@ -161,7 +167,7 @@ function renderPlayers() {
   });
 }
 
-/* main status: READY count, and the revealed command at 5/5 */
+/* main status: READY count, and the revealed command at 4/4 */
 function renderStatus() {
   var now = Date.now();
   var online = 0;
@@ -170,46 +176,48 @@ function renderStatus() {
   });
 
   if (state.results.size === DECIDER.ROLES.length) {
-    /* 5/5: read the five results once and reveal the command */
+    /* 4/4: read the four results once, reveal the command and run it
+     * exactly once (the per-second render() never restarts it) */
     if (!state.combined) {
       state.combined = true;
       pushEvent("⭐ All roles ready — command revealed");
+      executeCommand();
     }
     var cmd = buildCommand();
     resultText.textContent = cmd.line;
     resultText.classList.add("revealed");
     resultSub.textContent = cmd.sentence;
+    if (nextRoundBtn) nextRoundBtn.hidden = false;
   } else {
-    /* before 5/5: only the READY count, results stay hidden */
+    /* before 4/4: only the READY count, results stay hidden */
     resultText.textContent = state.results.size + " / " + DECIDER.ROLES.length + " READY";
     resultText.classList.remove("revealed");
     resultSub.textContent = "Players online: " + online + " · Submitted results are hidden";
+    if (nextRoundBtn) nextRoundBtn.hidden = true;
   }
 }
 
-/* ---------- combine & command reveal (5/5 only) ---------- */
+/* ---------- combine & command reveal (4/4 only) ---------- */
 
-var ACTION_GERUND = { Eat: "eating", Hit: "hitting", Use: "using" };
 var ENV_WORD = { Sunny: "sun", Rain: "rain", Snow: "snow" };
 
-/* Read the five results (fixed role order) and build:
- *   line:     "Rain · Run · Eat · Pizza · Umbrella"
- *   sentence: "Run in the rain while eating pizza with an umbrella." */
+/* Read the four results (fixed role order) and build:
+ *   line:     "Rain · Run · Pizza · Umbrella"
+ *   sentence: "Run in the rain with a pizza and an umbrella." */
 function buildCommand() {
   var env = state.results.get("environment");
-  var move = state.results.get("movement");
   var act = state.results.get("action");
   var obj = state.results.get("object");
   var tool = state.results.get("tool");
 
-  var line = [env, move, act, obj, tool].join(" · ");
+  var line = [env, act, obj, tool].join(" · ");
 
   var envWord = ENV_WORD[env] || String(env).toLowerCase();
-  var actWord = ACTION_GERUND[act] || String(act).toLowerCase() + "ing";
-  var objWord = String(obj).toLowerCase();
-  var objPhrase = act === "Eat" ? objWord : "the " + objWord;
-  var sentence = move + " in the " + envWord + " while " + actWord + " " +
-    objPhrase + " with " + article(String(tool).toLowerCase()) + ".";
+  var actWord = String(act);
+  var sentence = actWord.charAt(0) + actWord.slice(1).toLowerCase() +
+    " in the " + envWord + " with " +
+    article(String(obj).toLowerCase()) + " and " +
+    article(String(tool).toLowerCase()) + ".";
 
   return { line: line, sentence: sentence };
 }
@@ -217,6 +225,76 @@ function buildCommand() {
 function article(word) {
   return (/^[aeiou]/i.test(word) ? "an " : "a ") + word;
 }
+
+/* ---------- execute the revealed command (once per round) ---------- */
+
+/* result -> existing system call (see js/environment.js, js/animations.js,
+ * js/items.js - nothing new is built here) */
+var RESULT_ENV = { Sunny: "sunny", Rain: "rain", Snow: "snow" };
+var RESULT_CHAR = { Walk: "walk", Run: "run", Jump: "jump", Fall: "fall", Eat: "eat" };
+var RESULT_ITEM = {
+  Pizza: "pizza", Football: "football",
+  Umbrella: "umbrella", Hammer: "hammer", Flashlight: "flashlight", Phone: "phone",
+};
+
+/* Run the four combined results on the laptop:
+ *   Environment first, the Action animation at the same time, then the
+ *   Object item, and the Tool item shortly after (the item system can
+ *   only show one item at a time, so they take turns).
+ * Called only from the one-time 4/4 reveal in renderStatus(). */
+function executeCommand() {
+  var env = state.results.get("environment");
+  var act = state.results.get("action");
+  var obj = state.results.get("object");
+  var tool = state.results.get("tool");
+
+  var envId = RESULT_ENV[env];
+  if (envId) setEnvironment(envId);
+
+  var charState = RESULT_CHAR[act];
+  if (charState) playCharacterState(charState);
+
+  var objId = RESULT_ITEM[obj];
+  if (objId) showItem(objId);
+
+  var toolId = RESULT_ITEM[tool];
+  if (toolId) {
+    commandTimer = setTimeout(function () {
+      commandTimer = null;
+      showItem(toolId);
+    }, 2500);
+  }
+
+  console.log("[Command] " + [env, act, obj, tool].join(" · "));
+}
+
+/* ---------- next round ---------- */
+
+/* Reset everything for a new round: results are cleared (the players
+ * stay joined), the world goes back to idle/sunny/no item, the phones
+ * are told to re-arm their interaction and the status returns to
+ * 0 / 4 READY. */
+function nextRound() {
+  /* cancel a pending Object -> Tool item swap */
+  if (commandTimer) {
+    clearTimeout(commandTimer);
+    commandTimer = null;
+  }
+
+  state.results.clear();
+  state.combined = false;
+
+  playCharacterState("idle");
+  setEnvironment("sunny");
+  showItem("none");
+
+  channel.send({ type: "round-reset" });
+
+  pushEvent("🔄 Next round — 0 / 4 READY");
+  render();
+}
+
+if (nextRoundBtn) nextRoundBtn.onclick = nextRound;
 
 /* ---------- dev helper: fill roles that are not READY yet ---------- */
 
