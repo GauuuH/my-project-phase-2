@@ -64,20 +64,34 @@ body {
 
 .stage-wrap {
   position: relative;
-  display: grid;
-  place-items: center;
-  align-content: center;
-  gap: 16px;
-  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 12px 24px 30px;
+  min-height: 0;
+}
+
+/* takes all space left over after the result text and the event log */
+.world-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* ---------- game area ---------- */
 
-/* The box matches the map's own 16:9 aspect ratio, so the background
- * fills the whole game area without stretching. */
+/* The game area now fills all the space the stage gives it (the box
+ * matches the map's own 16:9 aspect ratio, so the background fills
+ * the whole game area without stretching). */
 .world {
   position: relative;
-  height: min(52vh, 560px);
+  height: 100%;
+  max-width: 100%;
   aspect-ratio: 16 / 9;
   width: auto;
   border: 1px solid var(--line);

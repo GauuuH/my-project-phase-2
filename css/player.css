@@ -146,6 +146,13 @@ input:focus {
 
 /* ---------- interaction test ---------- */
 
+.inter-binding {
+  font-size: 13px;
+  color: var(--accent);
+  text-align: center;
+  min-height: 1.2em;
+}
+
 .inter-select {
   display: grid;
   grid-template-columns: repeat(2, 1fr);

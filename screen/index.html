@@ -25,15 +25,17 @@
   </header>
 
   <main class="stage-wrap">
-    <div id="world" class="world game-area env-sunny">
-      <span class="game-area-label">GAME AREA</span>
-      <img id="mapBackground" class="map-background" src="../assets/room/Map.png" alt="Room background">
-      <div class="sun-overlay" aria-hidden="true"></div>
-      <div class="window-fx" id="windowFx" aria-hidden="true">
-        <div class="window-dim"></div>
+    <div class="world-wrap">
+      <div id="world" class="world game-area env-sunny">
+        <span class="game-area-label">GAME AREA</span>
+        <img id="mapBackground" class="map-background" src="../assets/room/Map.png" alt="Room background">
+        <div class="sun-overlay" aria-hidden="true"></div>
+        <div class="window-fx" id="windowFx" aria-hidden="true">
+          <div class="window-dim"></div>
+        </div>
+        <canvas id="character" class="character"></canvas>
+        <img id="item" class="item-layer" alt="Item or tool">
       </div>
-      <canvas id="character" class="character"></canvas>
-      <img id="item" class="item-layer" alt="Item or tool">
     </div>
 
     <div class="result">

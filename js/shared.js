@@ -45,6 +45,17 @@ var DECIDER = {
     { id: "press", name: "Press", icon: "👆" },
     { id: "tilt",  name: "Tilt",  icon: "📐" },
   ],
+
+  /* Role -> real phone interaction binding (dev):
+   * Environment = Blow, Movement = Shake, Action = Press & Hold,
+   * Object = Tilt, Tool = Swipe. */
+  ROLE_INTERACTION: {
+    environment: "blow",
+    movement: "shake",
+    action: "press",
+    object: "tilt",
+    tool: "swipe",
+  },
 };
 
 function roleById(id) {

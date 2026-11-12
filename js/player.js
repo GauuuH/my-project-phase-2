@@ -19,6 +19,7 @@ var youRole = document.getElementById("youRole");
 var youRoom = document.getElementById("youRoom");
 var youStatus = document.getElementById("youStatus");
 var leaveBtn = document.getElementById("leaveBtn");
+var interBinding = document.getElementById("interBinding");
 
 var selectedRoleId = null;
 var joined = false;
@@ -96,6 +97,17 @@ joinBtn.onclick = function () {
 
   joinSection.hidden = true;
   actionSection.hidden = false;
+
+  /* Role -> Interaction binding: auto-start this role's interaction.
+   * The manual test buttons stay available below (dev mode). */
+  var interId = DECIDER.ROLE_INTERACTION[selectedRoleId];
+  if (interId) {
+    var interLabel = typeof getInteractionLabel === "function"
+      ? getInteractionLabel(interId)
+      : interId;
+    interBinding.textContent = role.icon + " " + role.name + " is bound to " + interLabel;
+    if (typeof selectInteraction === "function") selectInteraction(interId);
+  }
 };
 
 leaveBtn.onclick = function () {
@@ -106,6 +118,7 @@ leaveBtn.onclick = function () {
   channel = null;
   joined = false;
   if (typeof stopAllInteractions === "function") stopAllInteractions();
+  interBinding.textContent = "";
   actionSection.hidden = true;
   joinSection.hidden = false;
 };

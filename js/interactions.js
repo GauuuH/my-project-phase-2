@@ -381,3 +381,8 @@ for (var i = 0; i < interBtns.length; i++) {
 
 /* expose for tests */
 function getCurrentInteraction() { return interCurrent; }
+
+function getInteractionLabel(id) {
+  var btn = interSelect.querySelector('.inter-btn[data-inter="' + id + '"]');
+  return btn ? btn.textContent.replace(/\s+/g, " ").trim() : id;
+}
