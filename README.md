@@ -39,7 +39,13 @@ DECIDER 游戏 Phase 2 基础网页原型（对应 `PLAN.md` 的 Day 2–3，提
    | ⚡ Action | 👆 Press & Hold（按住约 1.5 秒） |
    | 📦 Object | 📐 Tilt（DeviceOrientation 倾斜） |
    | 🔧 Tool | 👋 Swipe（快速滑动） |
-   页面下方保留 **Manual test (dev)** 五个按钮，可手动切换测试。检测成功后手机端只显示结果和 Completed/Ready 状态，暂不触发笔记本上的反馈。阈值在 `js/interactions.js` 顶部 `INTER_CONFIG`。
+   页面下方保留 **Manual test (dev)** 五个按钮，可手动切换测试。检测成功后随机生成该 Role 的一个结果（结果池在 `DECIDER.ROLE_RESULTS`）：
+   - Environment：Sunny / Rain / Snow
+   - Movement：Walk / Run / Jump / Fall
+   - Action：Eat / Hit / Use
+   - Object：Pizza / Football
+   - Tool：Umbrella / Hammer / Flashlight / Phone
+   结果生成后保持显示，交互同时锁定（点 ⟳ Try again 解锁重试），暂不触发笔记本上的反馈。阈值在 `js/interactions.js` 顶部 `INTER_CONFIG`。
 
 > 联机要求：笔记本和手机都要能上网（消息经公共 MQTT 服务器中转）。房间码保存在本地，下次打开还会沿用同一个码。
 

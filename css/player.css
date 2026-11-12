@@ -222,7 +222,30 @@ input:focus {
   font-weight: 600;
   color: var(--accent);
   text-align: center;
-  min-height: 1.4em;
+  min-height: 3.2em;
+}
+
+.result-big {
+  display: block;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.result-context {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 400;
+  margin-top: 3px;
+}
+
+.inter-reset {
+  align-self: center;
+  font-size: 12px;
+  padding: 7px 16px;
+  border-radius: 8px;
+  color: var(--accent);
 }
 
 /* blow level meter */

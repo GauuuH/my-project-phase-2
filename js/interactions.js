@@ -6,10 +6,18 @@
  *   tilt  : DeviceOrientation detects tilting the phone
  *   swipe : fast finger swipe in any direction
  *
- * Each interaction is selected with the Interaction Test buttons and
- * can be tested alone on one phone. After a detection the phone only
- * shows the result + "Completed", then returns to "Ready". Nothing is
- * sent to the laptop yet.
+ * Role -> Interaction -> Result flow:
+ *   - The interaction is only the input method.
+ *   - A successful interaction randomly generates one game result
+ *     from the bound role's pool (see DECIDER.ROLE_RESULTS):
+ *       Environment/Blow -> Sunny | Rain | Snow
+ *       Movement/Shake   -> Walk | Run | Jump | Fall
+ *       Action/Press     -> Eat | Hit | Use
+ *       Object/Tilt      -> Pizza | Football
+ *       Tool/Swipe       -> Umbrella | Hammer | Flashlight | Phone
+ *   - The result stays on screen and the interaction locks until the
+ *     player presses "Try again" (so one action can't spam results).
+ *   - Nothing is sent to the laptop yet.
  *
  * All thresholds are in INTER_CONFIG below - easy to tune.
  */
@@ -27,9 +35,10 @@ var interStage = document.getElementById("interStage");
 var interStatusText = document.getElementById("interStatusText");
 var interDot = document.getElementById("interDot");
 var interResult = document.getElementById("interResult");
+var interResetBtn = document.getElementById("interResetBtn");
 
 var interCurrent = null;
-var interCompleteTimer = null;
+var interLocked = false;
 
 /* per-detector state */
 var blowState = { stream: null, ctx: null, raf: null, aboveSince: 0, belowSince: 0, done: false };
@@ -45,19 +54,8 @@ function interSetStatus(kind, text) {
   interStatusText.textContent = text;
 }
 
-function interSetResult(text) {
-  interResult.textContent = text;
-}
-
-/* called by every detector when it detects its interaction */
-function interComplete(resultText) {
-  interSetResult(resultText);
-  interSetStatus("completed", "Completed");
-  clearTimeout(interCompleteTimer);
-  interCompleteTimer = setTimeout(function () {
-    interSetResult("");
-    interSetStatus("ready", "Ready");
-  }, 1500);
+function interSetResult(html) {
+  interResult.innerHTML = html;
 }
 
 function interStageClear() {
@@ -65,6 +63,57 @@ function interStageClear() {
   interSetResult("");
   interSetStatus(null, "Select an interaction");
 }
+
+/* ---------- role -> result ---------- */
+
+function roleForInteraction(interactionId) {
+  for (var roleId in DECIDER.ROLE_INTERACTION) {
+    if (DECIDER.ROLE_INTERACTION[roleId] === interactionId) return roleId;
+  }
+  return null;
+}
+
+function randomResult(roleId) {
+  var pool = DECIDER.ROLE_RESULTS[roleId];
+  if (!pool || !pool.length) return null;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+/* Called by every detector when its interaction is detected.
+ * Generates a random game result for the bound role, shows it and
+ * locks the interaction until "Try again" is pressed. */
+function interComplete() {
+  if (interLocked || !interCurrent) return;
+
+  var roleId = roleForInteraction(interCurrent);
+  var role = roleById(roleId);
+  var result = randomResult(roleId);
+
+  interSetResult(
+    '<span class="result-big">' + esc(result) + '</span>' +
+    '<span class="result-context">' + role.icon + " " + role.name + " · " +
+    esc(getInteractionLabel(interCurrent)) + '</span>'
+  );
+  interSetStatus("completed", "Completed · locked");
+  interLocked = true;
+  interResetBtn.hidden = false;
+
+  console.log("[Result] " + role.name + " -> " + result);
+}
+
+/* unlock after a result: clear it and re-arm the detector */
+function resetInteraction() {
+  interLocked = false;
+  interSetResult("");
+  interSetStatus("ready", "Ready");
+  interResetBtn.hidden = true;
+  blowState.done = false;
+  shakeState.armed = true;
+  tiltState.armed = true;
+  pressState.done = false;
+}
+
+interResetBtn.onclick = resetInteraction;
 
 /* ---------- switching ---------- */
 
@@ -82,7 +131,8 @@ function selectInteraction(id) {
 
 function stopAllInteractions() {
   interCurrent = null;
-  clearTimeout(interCompleteTimer);
+  interLocked = false;
+  interResetBtn.hidden = true;
 
   /* blow: release the microphone */
   if (blowState.raf) cancelAnimationFrame(blowState.raf);
@@ -177,12 +227,12 @@ function armBlow() {
       fill.style.height = Math.min(100, rms * 400) + "%";
 
       var cfg = INTER_CONFIG.blow;
-      if (rms > cfg.threshold) {
+      if (rms > cfg.threshold && !interLocked) {
         blowState.aboveSince += 16;
         blowState.belowSince = 0;
         if (blowState.aboveSince >= cfg.holdMs && !blowState.done) {
           blowState.done = true;
-          interComplete("💨 Blow detected");
+          interComplete();
         }
       } else {
         blowState.belowSince += 16;
@@ -193,7 +243,7 @@ function armBlow() {
     }
     blowState.raf = requestAnimationFrame(loop);
   }).catch(function () {
-    interSetStatus("error", "Microphone permission denied");
+    if (!interLocked) interSetStatus("error", "Microphone permission denied");
   });
 }
 
@@ -218,10 +268,11 @@ function armShake() {
         var dy = a.y - shakeState.last.y;
         var dz = a.z - shakeState.last.z;
         var mag = Math.sqrt(dx * dx + dy * dy + dz * dz);
-        if (shakeState.armed && mag > cfg.threshold && now - shakeState.lastShake > cfg.cooldownMs) {
+        if (shakeState.armed && !interLocked && mag > cfg.threshold &&
+            now - shakeState.lastShake > cfg.cooldownMs) {
           shakeState.lastShake = now;
           shakeState.armed = false;
-          interComplete("📳 Shake detected");
+          interComplete();
         }
         if (mag < cfg.calmMs) shakeState.armed = true;
       }
@@ -247,10 +298,15 @@ function armPress() {
   function step() {
     if (interCurrent !== "press") return;
     var p = Math.min(1, (Date.now() - startTime) / INTER_CONFIG.press.holdMs);
+    if (interLocked) {
+      /* locked: stop the progress animation */
+      fill.style.width = "0%";
+      return;
+    }
     fill.style.width = (p * 100) + "%";
     if (p >= 1) {
       pressState.done = true;
-      interComplete("👆 Press &amp; Hold (1.5 s)");
+      interComplete();
     } else {
       pressState.raf = requestAnimationFrame(step);
     }
@@ -258,7 +314,7 @@ function armPress() {
 
   function start(e) {
     e.preventDefault();
-    if (interCurrent !== "press") return;
+    if (interCurrent !== "press" || interLocked) return;
     startTime = Date.now();
     pressState.done = false;
     interSetStatus("active", "Holding…");
@@ -270,7 +326,7 @@ function armPress() {
     if (pressState.raf) cancelAnimationFrame(pressState.raf);
     pressState.raf = null;
     fill.style.width = "0%";
-    if (interCurrent === "press" && !pressState.done) {
+    if (interCurrent === "press" && !pressState.done && !interLocked) {
       interSetStatus("ready", "Ready");
     }
   }
@@ -303,14 +359,11 @@ function armTilt() {
       var now = Date.now();
       var cfg = INTER_CONFIG.tilt;
 
-      if (tiltState.armed && (absB > cfg.triggerDeg || absG > cfg.triggerDeg) &&
+      if (tiltState.armed && !interLocked && (absB > cfg.triggerDeg || absG > cfg.triggerDeg) &&
           now - tiltState.lastTrigger > cfg.cooldownMs) {
         tiltState.lastTrigger = now;
         tiltState.armed = false;
-        var dir;
-        if (absB > absG) dir = beta > 0 ? "forward" : "backward";
-        else dir = gamma > 0 ? "right" : "left";
-        interComplete("📐 Tilt detected (" + dir + ")");
+        interComplete();
       }
       if (absB < cfg.resetDeg && absG < cfg.resetDeg) tiltState.armed = true;
     };
@@ -334,7 +387,7 @@ function armSwipe() {
 
   function onStart(e) {
     e.preventDefault();
-    if (interCurrent !== "swipe") return;
+    if (interCurrent !== "swipe" || interLocked) return;
     var p = getXY(e);
     swipeState.sx = p.x; swipeState.sy = p.y;
     swipeState.st = Date.now();
@@ -351,12 +404,10 @@ function armSwipe() {
     var dt = Date.now() - swipeState.st;
     var cfg = INTER_CONFIG.swipe;
 
-    if (Math.max(Math.abs(dx), Math.abs(dy)) >= cfg.minDistance && dt <= cfg.maxDuration) {
-      var dir = Math.abs(dx) > Math.abs(dy)
-        ? (dx > 0 ? "right" : "left")
-        : (dy > 0 ? "down" : "up");
-      interComplete("👋 Swipe " + dir);
-    } else {
+    if (!interLocked &&
+        Math.max(Math.abs(dx), Math.abs(dy)) >= cfg.minDistance && dt <= cfg.maxDuration) {
+      interComplete();
+    } else if (!interLocked) {
       interSetStatus("ready", "Ready");
     }
   }
@@ -381,8 +432,17 @@ for (var i = 0; i < interBtns.length; i++) {
 
 /* expose for tests */
 function getCurrentInteraction() { return interCurrent; }
+function isInteractionLocked() { return interLocked; }
 
 function getInteractionLabel(id) {
   var btn = interSelect.querySelector('.inter-btn[data-inter="' + id + '"]');
   return btn ? btn.textContent.replace(/\s+/g, " ").trim() : id;
+}
+
+/* dev/test helper: simulate a successful detection of the current
+ * interaction (skips the real sensor, goes through the same
+ * result-generation path) */
+function debugInterComplete(interactionId) {
+  if (interactionId && interactionId !== interCurrent) return;
+  interComplete();
 }

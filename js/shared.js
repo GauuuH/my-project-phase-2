@@ -56,6 +56,17 @@ var DECIDER = {
     object: "tilt",
     tool: "swipe",
   },
+
+  /* Random game result pool for each role (dev). The interaction is
+   * only the input: e.g. a successful Blow randomly gives Sunny,
+   * Rain or Snow. */
+  ROLE_RESULTS: {
+    environment: ["Sunny", "Rain", "Snow"],
+    movement: ["Walk", "Run", "Jump", "Fall"],
+    action: ["Eat", "Hit", "Use"],
+    object: ["Pizza", "Football"],
+    tool: ["Umbrella", "Hammer", "Flashlight", "Phone"],
+  },
 };
 
 function roleById(id) {
