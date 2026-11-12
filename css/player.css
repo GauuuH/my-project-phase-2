@@ -56,6 +56,7 @@ h2 {
 }
 
 .role-btn {
+  position: relative;
   padding: 12px 8px;
   border-radius: 12px;
   display: flex;
@@ -64,6 +65,33 @@ h2 {
   gap: 4px;
   font-size: 13px;
   font-weight: 600;
+}
+
+/* occupied role: dimmed color block + 1/1 badge (one player per role) */
+.role-btn.occupied {
+  border-color: #fbbf24;
+  background: rgba(251, 191, 36, 0.10);
+  color: var(--muted);
+  opacity: 0.75;
+}
+
+.role-btn.occupied .icon {
+  filter: grayscale(0.6);
+  opacity: 0.7;
+}
+
+.role-count {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: #0a0e17;
+  background: #fbbf24;
+  border-radius: 8px;
+  padding: 1px 6px;
+  box-shadow: 0 0 8px -2px #fbbf24;
 }
 
 .role-btn .icon {
@@ -153,6 +181,65 @@ input:focus {
   min-height: 1.2em;
 }
 
+/* sequential-stage banner (WAITING FOR ... / READY / JOINING) */
+.stage-banner {
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px 12px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.stage-banner[hidden] {
+  display: none;
+}
+
+.stage-banner-title {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: var(--accent);
+}
+
+.stage-banner-sub {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* blow weather selector (Environment turn) */
+.blow-selector {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.selector-item {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--muted);
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.selector-item.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--panel-2);
+  box-shadow: 0 0 12px -4px var(--accent);
+}
+
+.blow-tip {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
 .inter-select {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -216,6 +303,8 @@ input:focus {
 .inter-dot.active { background: #fbbf24; box-shadow: 0 0 8px #fbbf24; }
 .inter-dot.completed { background: var(--accent); box-shadow: 0 0 10px var(--accent); }
 .inter-dot.error { background: #f87171; box-shadow: 0 0 8px #f87171; }
+.inter-dot.waiting { background: #fbbf24; opacity: 0.55; }
+.inter-dot.warn { background: #fbbf24; box-shadow: 0 0 8px #fbbf24; }
 
 .inter-result {
   font-size: 15px;

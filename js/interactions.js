@@ -1,6 +1,9 @@
-/* DECIDER - real phone interactions (dev test mode)
+/* DECIDER - real phone interactions
  *
- *   blow  : microphone (Web Audio) detects blowing into the phone
+ *   blow  : microphone (Web Audio) detects blowing into the phone.
+ *           For the Environment role it is a continuous WEATHER
+ *           SELECTOR: keep blowing to cycle Sunny -> Rain -> Snow,
+ *           stop blowing to choose the current weather.
  *   shake : DeviceMotion detects a real shake
  *   press : touch & hold for ~1.5 s  (dev/test only - bound to NO role)
  *   tilt  : DeviceOrientation detects tilting the phone
@@ -8,15 +11,19 @@
  *
  * Role -> Interaction -> Result flow:
  *   - The interaction is only the input method.
- *   - A successful interaction randomly generates one game result
- *     from the bound role's pool (see DECIDER.ROLE_RESULTS):
- *       Environment/Blow   -> Sunny | Rain | Snow
+ *   - A successful interaction produces one game result from the
+ *     bound role's pool (see DECIDER.ROLE_RESULTS):
+ *       Environment/Blow   -> Sunny | Rain | Snow (chosen, not random)
+ *       Direction/Swipe    -> Left | Right | Up | Down (the real
+ *                             swipe direction, never a random draw)
  *       Action/Shake       -> Walk | Run | Jump | Fall | Eat
  *       Item/Tilt          -> Pizza | Football | Umbrella | Hammer |
  *                             Flashlight | Phone
- *       Direction/Swipe    -> Left | Right | Up | Down
- *   - Direction is special: the result IS the real swipe direction
- *     (the swipe detector passes it in), never a random draw.
+ *   - Sequential flow: the Action and Item pools can be narrowed by
+ *     the laptop (setRolePool) from the earlier players' results, so
+ *     e.g. the Item player only draws Items allowed by the chosen
+ *     Action. Submissions are blocked outside the player's own stage
+ *     (stageAllowsSubmission), mirrored by the laptop.
  *   - Press & Hold has no role bound to it, so it generates no game
  *     result and takes no part in the round - it only confirms the
  *     detection on the phone.
@@ -29,6 +36,8 @@
 var INTER_CONFIG = {
   blow: {
     threshold: 0.05, /* BLOW_THRESHOLD from the tested old sketch: getLevel() > 0.05 = blow */
+    cycleMs: 700,    /* one weather step per 700 ms of continuous blowing */
+    stopMs: 300,     /* level below threshold this long = stopped -> select */
   },
   shake: { threshold: 22, cooldownMs: 1200, calmMs: 8 },
   press: { holdMs: 1500 },
@@ -50,10 +59,21 @@ var lastResult = null;      /* { roleId, result } of the latest completion */
 
 /* per-detector state */
 var blowState = { sketch: null, mic: null, done: false };
+var blowSelector = { index: 0, steps: 0, lastStep: 0, belowSince: 0, weather: "Sunny" };
 var shakeState = { handler: null, last: null, lastShake: 0, armed: true };
 var tiltState = { handler: null, lastTrigger: 0, armed: true };
 var pressState = { raf: null, done: false };
 var swipeState = { tracking: false, sx: 0, sy: 0, st: 0 };
+
+/* Sequential flow: pool overrides set by player.js from the laptop's
+ * stage-state message (the Action / Item pool depends on the earlier
+ * players' results). */
+var poolOverrides = {}; /* roleId -> [results] */
+
+function setRolePool(roleId, pool) {
+  if (roleId && pool && pool.length) poolOverrides[roleId] = pool.slice();
+  else delete poolOverrides[roleId];
+}
 
 /* ---------- status helpers ---------- */
 
@@ -82,7 +102,7 @@ function roleForInteraction(interactionId) {
 }
 
 function randomResult(roleId) {
-  var pool = DECIDER.ROLE_RESULTS[roleId];
+  var pool = poolOverrides[roleId] || DECIDER.ROLE_RESULTS[roleId];
   if (!pool || !pool.length) return null;
   return pool[Math.floor(Math.random() * pool.length)];
 }
@@ -142,9 +162,18 @@ function interComplete(resultOverride) {
   console.log("[Result] " + role.name + " -> " + result);
 }
 
-/* send the current result to the room (once) */
+/* send the current result to the room (once).
+ * The sequential flow is enforced on BOTH ends: this phone only
+ * sends when its role is the current stage (stageAllowsSubmission
+ * from player.js), and the laptop re-validates the message. */
 function submitResult() {
   if (!lastResult) return;
+  if (typeof stageAllowsSubmission === "function" &&
+      !stageAllowsSubmission(lastResult.roleId)) {
+    interSetStatus("warn", "Not your turn — wait for your stage");
+    interResetBtn.hidden = false;
+    return;
+  }
   var ok = typeof sendPlayerResult === "function"
     ? sendPlayerResult(lastResult.roleId, lastResult.result)
     : false;
@@ -257,7 +286,17 @@ function ensureMotionPermission(kind) {
 /* Same detection as the tested old sketch:
  *   mic = new p5.AudioIn(); amplitude = new p5.Amplitude();
  *   mic.disconnect(); mic.connect(amplitude);
- *   level = amplitude.getLevel();  level > threshold (0.05) = blow */
+ *   level = amplitude.getLevel();  level > threshold (0.05) = blow
+ *
+ * Blow is now a continuous WEATHER SELECTOR (no random result):
+ * the selector starts on Sunny, and while the player keeps blowing it
+ * cycles Sunny -> Rain -> Snow -> Sunny... every cycleMs. When the
+ * level drops below the threshold and stays there for stopMs, the
+ * current weather becomes the Environment result. At least one real
+ * cycle step must happen first, so a momentary threshold touch never
+ * submits anything. */
+var WEATHER_ORDER = ["Sunny", "Rain", "Snow"];
+
 function armBlow() {
   if (typeof p5 === "undefined") {
     interSetStatus("error", "p5 sound library not loaded");
@@ -269,8 +308,21 @@ function armBlow() {
   }
 
   var threshold = INTER_CONFIG.blow.threshold;
+  var cycleMs = INTER_CONFIG.blow.cycleMs;
+  var stopMs = INTER_CONFIG.blow.stopMs;
+
+  /* reset the selector for this turn */
+  blowSelector = { index: 0, steps: 0, lastStep: 0, belowSince: 0, weather: "Sunny" };
+  blowState.done = false;
+
   interStage.innerHTML =
-    '<p class="inter-hint">Blow into the microphone</p>' +
+    '<p class="inter-hint">BLOW TO CHANGE THE WEATHER</p>' +
+    '<div class="blow-selector">' +
+    '  <div class="selector-item active" data-weather="Sunny">☀️ SUNNY</div>' +
+    '  <div class="selector-item" data-weather="Rain">🌧️ RAIN</div>' +
+    '  <div class="selector-item" data-weather="Snow">❄️ SNOW</div>' +
+    '</div>' +
+    '<p class="blow-tip">Keep blowing to change weather.<br>Stop blowing to choose.</p>' +
     '<div class="blow-meter"><div class="blow-fill" id="blowFill"></div></div>' +
     '<div class="blow-stats">' +
     '<span>level <b id="blowLevel">0.000</b></span>' +
@@ -280,7 +332,6 @@ function armBlow() {
   var levelEl = document.getElementById("blowLevel");
 
   interSetStatus("active", "Requesting microphone…");
-  blowState.done = false;
 
   blowState.sketch = new p5(function (p) {
     var mic = null;
@@ -296,7 +347,7 @@ function armBlow() {
 
       mic.start(function () {
         if (interCurrent === "blow" && !interLocked) {
-          interSetStatus("ready", "Ready — blow into the microphone");
+          interSetStatus("ready", "Ready — blow to cycle the weather");
         }
       }, function () {
         if (!interLocked) interSetStatus("error", "Microphone permission denied");
@@ -310,15 +361,39 @@ function armBlow() {
       fill.style.height = Math.min(100, level * 300) + "%";
       levelEl.textContent = level.toFixed(3);
 
-      if (level > threshold && !interLocked && !blowState.done) {
-        blowState.done = true;
-        interComplete();
-      }
-      if (level < threshold * 0.6) {
-        blowState.done = false; /* re-arm once it goes quiet */
+      if (interLocked || blowState.done) return; /* selection already made */
+
+      var now = Date.now();
+      if (level > threshold) {
+        /* blowing: cycle the weather selector at a fixed pace */
+        blowSelector.belowSince = 0;
+        if (now - blowSelector.lastStep >= cycleMs) {
+          blowSelector.lastStep = now;
+          blowSelector.index = (blowSelector.index + 1) % WEATHER_ORDER.length;
+          blowSelector.steps++;
+          blowSelector.weather = WEATHER_ORDER[blowSelector.index];
+          updateBlowSelectorUi(blowSelector.weather);
+        }
+      } else if (blowSelector.steps > 0) {
+        /* stopped blowing: after a short pause the shown weather is
+         * chosen. Needs at least one cycle step, so a momentary
+         * threshold touch can never submit. */
+        if (!blowSelector.belowSince) blowSelector.belowSince = now;
+        if (now - blowSelector.belowSince >= stopMs) {
+          blowState.done = true;
+          interComplete(blowSelector.weather);
+        }
       }
     };
   });
+}
+
+/* highlight the currently selected weather on the phone */
+function updateBlowSelectorUi(weather) {
+  var items = interStage.querySelectorAll(".selector-item");
+  for (var i = 0; i < items.length; i++) {
+    items[i].classList.toggle("active", items[i].getAttribute("data-weather") === weather);
+  }
 }
 
 /* ---------- shake (DeviceMotion) ---------- */

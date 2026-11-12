@@ -10,7 +10,10 @@
  *   { type: "player-heartbeat", playerId }
  *   { type: "player-leave",     playerId }
  *   { type: "screen-ready" }
- *   { type: "round-reset" }  (laptop -> phones: re-arm for a new round)
+ *   { type: "screen-ping" }   (phone join screen -> laptop: please send room status)
+ *   { type: "round-reset" }  (laptop -> phones: new round, currentStage)
+ *   { type: "stage-state" }  (laptop -> phones: currentStage, done roles,
+ *                             occupied roles, actionPool / itemPool)
  *
  * NOTE: the broker is public, so anyone who knows the room code can read
  * or send game messages. Fine for a prototype. Later (own server) this
@@ -58,15 +61,40 @@ var DECIDER = {
     direction: "swipe",
   },
 
-  /* Result pool for each role. The interaction is only the input:
-   * e.g. a successful Blow randomly gives Sunny, Rain or Snow. The
-   * Direction pool is used by DEV Fill / random fallbacks only - a
-   * real phone Swipe produces the real swipe direction instead. */
+  /* Result pool for each role. The interaction is only the input.
+   * Environment results are CHOSEN by the Blow weather selector (not
+   * random); the Direction pool is used by DEV Fill / fallbacks only
+   * (a real Swipe produces the real swipe direction); the Action and
+   * Item pools can be narrowed by earlier results (see below). */
   ROLE_RESULTS: {
     environment: ["Sunny", "Rain", "Snow"],
     action: ["Walk", "Run", "Jump", "Fall", "Eat"],
     item: ["Pizza", "Football", "Umbrella", "Hammer", "Flashlight", "Phone"],
     direction: ["Left", "Right", "Up", "Down"],
+  },
+
+  /* Sequential flow: the fixed order in which the four roles act.
+   * Only the role at the current stage may run its interaction and
+   * submit - enforced by the laptop (and mirrored on the phones). */
+  STAGE_ORDER: ["environment", "direction", "action", "item"],
+
+  /* Which Items the finished Action makes available to the Item
+   * player. The Item turn only draws from this list, so the earlier
+   * player truly changes the later player's options. */
+  ACTION_ITEM_MAP: {
+    Walk: ["Flashlight", "Hammer", "Umbrella", "Phone"],
+    Run: ["Flashlight", "Hammer", "Umbrella", "Phone"],
+    Jump: ["Football", "Hammer", "Phone"],
+    Fall: ["Football", "Phone"],
+    Eat: ["Pizza"],
+  },
+
+  /* Which Actions are available given the finished Environment +
+   * Direction. Tonight every combination still offers the same five
+   * actions - add specific "Env+Dir" keys later to make combos
+   * special (e.g. "Snow+Down": ["Fall"]). */
+  ACTION_COMPATIBILITY: {
+    "*": ["Walk", "Run", "Jump", "Fall", "Eat"],
   },
 };
 
@@ -81,6 +109,22 @@ function actionById(id) {
 /* pick a random item from an array */
 function randomFrom(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
+}
+
+/* Actions available for a given Environment + Direction result.
+ * Falls back to the "*" entry - extend ACTION_COMPATIBILITY with
+ * specific "Env+Dir" keys later. */
+function actionsFor(env, dir) {
+  var pool = DECIDER.ACTION_COMPATIBILITY["*"] || [];
+  var key = (env || "") + "+" + (dir || "");
+  if (DECIDER.ACTION_COMPATIBILITY[key]) pool = DECIDER.ACTION_COMPATIBILITY[key];
+  return pool.slice();
+}
+
+/* Items available for a given Action result (ACTION_ITEM_MAP). */
+function itemsFor(action) {
+  var pool = DECIDER.ACTION_ITEM_MAP[action];
+  return pool ? pool.slice() : null;
 }
 
 /* ---------- room code ---------- */

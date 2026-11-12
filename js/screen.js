@@ -6,11 +6,13 @@
  *    never shown) and marks that role READY. No environment /
  *    character / item feedback is triggered before 4/4.
  * The main status shows how many roles are READY, e.g. "2 / 4 READY".
- * At 4/4 the four results are combined, the command is revealed AND
- * executed once: weather changes, the character plays the Action
- * animation, physically moves in the Direction and the Item follows
- * the character. The NEXT ROUND button then resets the round and
- * re-arms every phone.
+ * The round is SEQUENTIAL: Environment -> Direction -> Action -> Item.
+ * Only the role at the current stage may act and submit; the laptop
+ * enforces the order, broadcasts stage-state to the phones and only
+ * at 4/4 combines, reveals AND executes the command once: weather
+ * changes, the character plays the Action animation, physically moves
+ * in the Direction and the Item follows the character. The NEXT ROUND
+ * button then resets the round and re-arms every phone.
  * Works with any number of players (1-2 phones are enough to test).
  */
 
@@ -21,6 +23,7 @@ var state = {
   results: new Map(),   /* roleId -> result (stored secretly until 4/4) */
   events: [],           /* recent log lines, newest first */
   combined: false,      /* true once the 4/4 command was revealed */
+  currentStage: "environment", /* role allowed to act now (null = all done) */
 };
 
 var nextRoundBtn = document.getElementById("nextRoundBtn");
@@ -57,10 +60,13 @@ function updateConnStatus(status) {
   }
 }
 
-/* Re-announced regularly so a refreshed screen re-syncs quickly. */
+/* Re-announced regularly so a refreshed screen re-syncs quickly.
+ * The stage state rides along so phones always converge on the
+ * correct stage even if they missed a broadcast. */
 channel.send({ type: "screen-ready" });
 setInterval(function () {
   channel.send({ type: "screen-ready" });
+  broadcastStageState();
 }, 5000);
 
 function handleMessage(msg) {
@@ -80,19 +86,29 @@ function handleMessage(msg) {
         pushEvent((role ? role.icon + " " : "") + esc(msg.player.name) + " joined as " +
           (role ? role.name : "?"));
       }
+      /* sync the joiner (and everyone else) with the current stage */
+      broadcastStageState();
       break;
 
     /* a phone finished its interaction and submitted its result.
-     * Store it per role (secret), mark the role READY. Do NOT show
-     * the result itself and do NOT trigger any game feedback yet. */
+     * Sequential flow: only the role at the current stage may submit
+     * - anything else is ignored, so nobody can skip the order.
+     * Store it per role (secret), mark the role READY and advance the
+     * stage. Results are never shown before 4/4. */
     case "player-result": {
       var rp = state.players.get(msg.playerId);
       if (!rp) break;
       if (rp.roleId !== msg.roleId || !msg.result) break; /* sanity */
+      if (msg.roleId !== state.currentStage) {
+        console.warn("[DECIDER] out-of-order result ignored: " + msg.roleId +
+          " (stage is " + state.currentStage + ")");
+        break;
+      }
       rp.lastSeen = Date.now();
       state.results.set(msg.roleId, msg.result);
       var rrole = roleById(msg.roleId);
       pushEvent((rrole ? rrole.icon + " " : "") + esc(rp.name) + " is ready");
+      advanceStage();
       break;
     }
 
@@ -110,9 +126,61 @@ function handleMessage(msg) {
       }
       break;
     }
+
+    /* a phone that just opened the join screen asks for the current
+     * room status (which roles are occupied) - answer immediately */
+    case "screen-ping":
+      broadcastStageState();
+      break;
   }
 
   render();
+}
+
+/* ---------- sequential stage flow ---------- */
+
+/* Move to the next role in DECIDER.STAGE_ORDER (null once all four
+ * acted) and tell every phone about it. */
+function advanceStage() {
+  var idx = DECIDER.STAGE_ORDER.indexOf(state.currentStage);
+  state.currentStage = DECIDER.STAGE_ORDER[idx + 1] || null;
+  broadcastStageState();
+}
+
+/* Tell all phones which stage the round is at, which roles already
+ * finished (role ids only - never the results themselves), which
+ * roles are occupied (have an online player, so new joiners can see
+ * 1/1 badges), and, when the next player's options depend on earlier
+ * results, the pool they may draw from (Action pool, or Items
+ * allowed by the chosen Action). */
+function broadcastStageState() {
+  var now = Date.now();
+  var occupied = [];
+  state.players.forEach(function (p) {
+    if (now - p.lastSeen < OFFLINE_AFTER_MS && occupied.indexOf(p.roleId) < 0) {
+      occupied.push(p.roleId);
+    }
+  });
+
+  var msg = {
+    type: "stage-state",
+    currentStage: state.currentStage,
+    done: Array.from(state.results.keys()),
+    occupied: occupied,
+    actionPool: null,
+    itemPool: null,
+  };
+
+  if (state.currentStage === "action") {
+    msg.actionPool = actionsFor(
+      state.results.get("environment"),
+      state.results.get("direction")
+    );
+  } else if (state.currentStage === "item") {
+    msg.itemPool = itemsFor(state.results.get("action"));
+  }
+
+  channel.send(msg);
 }
 
 /* ---------- log ---------- */
@@ -192,9 +260,11 @@ function renderStatus() {
     if (nextRoundBtn) nextRoundBtn.hidden = false;
   } else {
     /* before 4/4: only the READY count, results stay hidden */
+    var turnRole = roleById(state.currentStage);
+    var turnText = turnRole ? " · Turn: " + turnRole.name : "";
     resultText.textContent = state.results.size + " / " + DECIDER.ROLES.length + " READY";
     resultText.classList.remove("revealed");
-    resultSub.textContent = "Players online: " + online + " · Submitted results are hidden";
+    resultSub.textContent = "Players online: " + online + turnText + " · Submitted results are hidden";
     if (nextRoundBtn) nextRoundBtn.hidden = true;
   }
 }
@@ -203,16 +273,16 @@ function renderStatus() {
 
 var ENV_WORD = { Sunny: "sun", Rain: "rain", Snow: "snow" };
 
-/* Read the four results (fixed role order) and build:
- *   line:     "Rain · Run · Pizza · Right"
+/* Read the four results (stage order) and build:
+ *   line:     "Rain · Right · Run · Pizza"
  *   sentence: "Run right in the rain with a pizza." */
 function buildCommand() {
   var env = state.results.get("environment");
+  var dir = state.results.get("direction");
   var act = state.results.get("action");
   var item = state.results.get("item");
-  var dir = state.results.get("direction");
 
-  var line = [env, act, item, dir].join(" · ");
+  var line = [env, dir, act, item].join(" · ");
 
   var envWord = ENV_WORD[env] || String(env).toLowerCase();
   var actWord = String(act);
@@ -300,10 +370,12 @@ function executeCommand() {
 /* ---------- next round ---------- */
 
 /* Reset everything for a new round: results are cleared (the players
- * stay joined), the character goes back to the center in idle, the
- * weather returns to sunny, the item disappears, any pending movement
- * / item timer is cancelled, the phones are told to re-arm their
- * interaction and the status returns to 0 / 4 READY. */
+ * stay joined), the stage goes back to Environment, the character
+ * goes back to the center in idle, the weather returns to sunny, the
+ * item disappears, any pending movement / item timer is cancelled,
+ * the phones are told to re-arm and the status returns to 0 / 4
+ * READY. The round-reset message carries the new stage so every
+ * phone knows who starts. */
 function nextRound() {
   /* cancel a pending Eat + Pizza hide */
   if (itemTimer) {
@@ -313,13 +385,14 @@ function nextRound() {
 
   state.results.clear();
   state.combined = false;
+  state.currentStage = "environment";
 
   if (typeof resetCharacterPosition === "function") resetCharacterPosition();
   playCharacterState("idle");
   setEnvironment("sunny");
   showItem("none");
 
-  channel.send({ type: "round-reset" });
+  channel.send({ type: "round-reset", currentStage: state.currentStage });
 
   pushEvent("🔄 Next round — 0 / 4 READY");
   render();
@@ -330,18 +403,40 @@ if (nextRoundBtn) nextRoundBtn.onclick = nextRound;
 /* ---------- dev helper: fill roles that are not READY yet ---------- */
 
 /* Only fills roles without a real phone result; real results are
- * never overwritten. Triggers the same Combine -> Reveal flow. */
+ * never overwritten. Fills in STAGE_ORDER (Environment -> Direction ->
+ * Action -> Item) and respects the dependencies: the Item draw obeys
+ * ACTION_ITEM_MAP and the Action draw uses the Environment + Direction
+ * compatibility map. Ends with a consistent state (all four done,
+ * stage complete) and the same Combine -> Reveal flow. */
 function devFillMissingRoles() {
   var filled = 0;
-  DECIDER.ROLES.forEach(function (role) {
-    if (!state.results.has(role.id)) {
-      var pool = DECIDER.ROLE_RESULTS[role.id];
-      if (pool && pool.length) {
-        state.results.set(role.id, randomFrom(pool));
-        filled++;
-      }
+  DECIDER.STAGE_ORDER.forEach(function (roleId) {
+    if (state.results.has(roleId)) return;
+
+    var result = null;
+    if (roleId === "item") {
+      /* Item must respect the already-filled Action */
+      var pool = itemsFor(state.results.get("action")) || DECIDER.ROLE_RESULTS.item;
+      result = randomFrom(pool);
+    } else if (roleId === "action") {
+      /* Action respects the already-filled Environment + Direction */
+      var actions = actionsFor(
+        state.results.get("environment"),
+        state.results.get("direction")
+      );
+      result = randomFrom(actions.length ? actions : DECIDER.ROLE_RESULTS.action);
+    } else {
+      result = randomFrom(DECIDER.ROLE_RESULTS[roleId]);
     }
+
+    state.results.set(roleId, result);
+    filled++;
   });
+
+  /* stage follows the filled results: all done */
+  state.currentStage = null;
+  broadcastStageState();
+
   if (filled > 0) {
     pushEvent("DEV: filled " + filled + " missing role(s)");
   }

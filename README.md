@@ -32,30 +32,28 @@ DECIDER 游戏 Phase 2 基础网页原型（对应 `PLAN.md` 的 Day 2–3，提
 1. 笔记本用 Chrome/Edge 打开 `screen/index.html`（本地双击，或 Pages 上的链接均可）。
 2. 记住主屏幕右上角的 **4 位房间码**（如 `KX7P`）。
 3. 手机上打开玩家页 `player/index.html`：输入房间码 → 选角色 → 输入名字 → **Join the game**。
-4. 加入后**自动启动该角色绑定的交互**（`js/shared.js` 里 `DECIDER.ROLE_INTERACTION`，开发绑定）：
+   - 输入房间码后手机就会**预先监听房间**（Laptop 通过 `screen-ping` / `stage-state` 回复），角色选择区会实时显示哪些 Role 已被占用：已占用的按钮变暗并带 **1/1** 角标（一个角色同一时间只有一个玩家），新玩家应选择空闲角色。
+4. 加入后**不会立刻启动交互**——本轮是**顺序依赖流程**（`js/shared.js` 里 `DECIDER.STAGE_ORDER`，顺序固定为 Environment → Direction → Action → Item）：
    | Role | Interaction |
    | --- | --- |
-   | 🌍 Environment | 💨 Blow（麦克风吹气，p5.AudioIn + p5.Amplitude，`amplitude.getLevel() > 0.05` 判定吹气成功） |
-   | ⚡ Action | 📳 Shake（DeviceMotion 摇晃） |
-   | 📦 Item | 📐 Tilt（DeviceOrientation 倾斜） |
-   | 🧭 Direction | 👋 Swipe（快速滑动，**结果 = 真实滑动方向**） |
-   Press & Hold（👆）保留在页面上但**不绑定任何 Role**，仅作 dev/test 交互，不产生游戏结果、不参与本轮。页面下方保留 **Manual test (dev)** 按钮，可手动切换测试。检测成功后的结果（结果池在 `DECIDER.ROLE_RESULTS`）：
-   - Environment：Sunny / Rain / Snow
-   - Action：Walk / Run / Jump / Fall / Eat
-   - Item：Pizza / Football / Umbrella / Hammer / Flashlight / Phone（原 Object + Tool 合并）
-   - Direction：Left / Right / Up / Down（**真实 Swipe 方向**，非随机；DEV Fill 时才随机补）
-   结果生成后保持显示，交互同时锁定（点 ⟳ Try again 解锁重试），暂不触发笔记本上的反馈。阈值在 `js/interactions.js` 顶部 `INTER_CONFIG`。
-5. 玩家完成自己 Role 的交互得到结果后，手机立即通过 MQTT 向房间发送 `player-result`（playerId / roleId / result），手机进入 **READY — result sent**，本轮不可重复提交（手动测试其他 Role 的交互只在本机显示，不会提交）。
-6. 笔记本收到结果后**只按 Role 秘密保存**（不显示具体选择、不触发任何环境/角色/道具反馈）；四个 Role Card 中已提交的显示 **● READY**，未提交的显示 WAITING/online；主状态显示 **X / 4 READY**（1–2 台手机也能正常测试）。
-7. **Combine & Command Reveal + Execute**：当四个 Role 的结果全部收到（`state.results.size === DECIDER.ROLES.length`）时，主屏幕一次性读取四个结果，Reveal 完整 Command 并**执行一次**（`js/screen.js` 的 `executeCommand`），例如：
-   - `Rain · Run · Pizza · Right`
+   | 🌍 Environment | 💨 Blow（天气选择器：持续吹气循环 Sunny → Rain → Snow，停止吹气 = 选定，**玩家主动选择，非随机**） |
+   | 🧭 Direction | 👋 Swipe（快速滑动，**结果 = 真实滑动方向** Left/Right/Up/Down） |
+   | ⚡ Action | 📳 Shake（DeviceMotion 摇晃 → Walk / Run / Jump / Fall / Eat） |
+   | 📦 Item | 📐 Tilt（DeviceOrientation 倾斜；**可选 Item 由已完成的 Action 决定**，见 `ACTION_ITEM_MAP`） |
+   - 只有**当前轮到的 Role** 才能执行自己的 Interaction 并提交；Laptop 保存结果但不 Reveal，通过 MQTT 广播 `stage-state` 自动推进：上一位玩家提交后，下一位玩家的手机自动从 **WAITING FOR …** 切换成 **YOUR TURN** 并自动启动对应 Interaction（无需任何按钮）。
+   - 未轮到的手机显示 `WAITING FOR <当前 Role>` + `Please wait for the <Role> player.`；已完成自己 Role 的手机锁定并显示 READY；迟加入的玩家加入后根据 Laptop 的 currentStage 自动同步（顺序由 Laptop 强制校验，任何 Role 无法绕过顺序提前提交）。
+   - Press & Hold（👆）保留在页面上但**不绑定任何 Role**，仅作 dev/test 交互，不产生游戏结果、不参与本轮。页面下方保留 **Manual test (dev)** 按钮。阈值在 `js/interactions.js` 顶部 `INTER_CONFIG`。
+5. **Environment = Blow 天气选择器**：初始 selector = Sunny，麦克风 `getLevel() > 0.05` 时每 ~700ms 循环一步 Sunny → Rain → Snow；level 降回阈值以下并保持 ~300ms = 停止吹气，当前显示的天气即为 Environment 结果并自动提交。必须至少发生一次有效循环步（防止瞬间误触）。手机实时高亮 ☀️/🌧️/❄️，只有 Environment 手机看到 selector，Laptop 提前不显示选择。
+6. 笔记本收到结果后**只按 Role 秘密保存**（不显示具体选择、不触发任何环境/角色/道具反馈）；四个 Role Card 中已提交的显示 **● READY**，主状态显示 **X / 4 READY**，并显示当前 Turn。
+7. **Combine & Command Reveal + Execute**：四个 Role 全部完成后（`state.results.size === DECIDER.ROLES.length`），主屏幕一次性 Reveal（顺序 Environment · Direction · Action · Item）并**执行一次**（`js/screen.js` 的 `executeCommand`），例如：
+   - `Rain · Right · Run · Pizza`
    - `Run right in the rain with a pizza.`
-   执行直接复用现有系统：Environment → `setEnvironment()`；Action → `playCharacterState()`；Direction → `moveCharacter()`（`js/animations.js`，平滑位移动画，无瞬移）；Item → `showItem()`（跟随角色）。每轮只执行一次（不受每秒 render() 影响）。
-   - **Character movement**：Reveal 后角色按 Direction 平滑移动到新位置（Walk 较慢 / Run 更快 / Jump、Fall 中等 / Eat 几乎不动），移动距离在 `js/animations.js` 顶部 `MOVE_CONFIG`（每轮约 game area 的 12%–15%），并限制在 `MOVE_CONFIG.bounds` 内不会走出 Game Area。只移动 Character canvas 位置，不改 sprite PNG。
+   执行直接复用现有系统：Environment → `setEnvironment()`；Action + Direction → `playCharacterState()`（Walk/Run 用 WalkLeft/WalkRight/RunLeft/RunRight 真实方向资产）+ `moveCharacter()`（平滑位移，无瞬移）；Item → `showItem()`（跟随角色）。每轮只执行一次（不受每秒 render() 影响）。
+   - **Action → Item 依赖**：Item 的可选池由已完成的 Action 决定（`DECIDER.ACTION_ITEM_MAP`）：Walk/Run → Flashlight/Hammer/Umbrella/Phone；Jump → Football/Hammer/Phone；Fall → Football/Phone；Eat → Pizza。Laptop 通过 `stage-state` 把 pool 发给 Item 手机，Tilt 只在 pool 内随机。
    - **Eat + Pizza 特殊互动**：Pizza 显示在角色嘴附近 → Eat 动画播放 → 动画结束后 Pizza 自动消失；其他 Item 只需正确跟随角色。
-   4/4 之前只显示 READY 计数，绝不泄露具体结果，也不触发角色/环境/道具。
-   - **DEV: Fill Missing Roles** 按钮（右侧 DEV 面板）：只为尚未 READY 的四个 Role 随机补测试结果（真实手机提交的结果不会被覆盖；Direction 随机 Left/Right/Up/Down），补足 4/4 后走同一套 Combine → Reveal → Execute 流程。仅开发测试用。
-8. **NEXT ROUND**：Reveal 后主屏幕出现 **NEXT ROUND →** 按钮。点击后开始新一轮：清空 `state.results`、`combined = false`、取消未完成的 Item/移动计时器，Character 回到初始中央位置并回 Idle、Environment 回 Sunny、Item 回 None、Direction 状态清除、四个 Role Card 回到已加入但未 READY、主状态回到 `0 / 4 READY`；同时通过 MQTT 向房间广播 `round-reset`，每台已加入的手机收到后自动清除上一轮 Result/READY 状态并重新启动自己 Role 的交互，四个玩家无需退出或刷新即可直接开始第二轮。
+   4/4 之前只显示 READY 计数，绝不泄露具体结果。
+   - **DEV: Fill Missing Roles** 按钮（右侧 DEV 面板）：按 Environment → Direction → Action → Item 顺序补缺失结果，且 Item 遵守 `ACTION_ITEM_MAP`、Action 遵守 `ACTION_COMPATIBILITY`（目前全部组合都允许五种 Action，后续可加 "Env+Dir" 专属规则）；补足后走同一套 Reveal → Execute 流程，不会破坏 currentStage。仅开发测试用。
+8. **NEXT ROUND**：Reveal 后主屏幕出现 **NEXT ROUND →** 按钮。点击后开始新一轮：清空 `state.results`、`combined = false`、`currentStage` 重置为 Environment、取消未完成的 Item/移动/天气选择计时器，Character 回到初始中央位置并回 Idle、Environment 回 Sunny、Item 回 None、四个 Role Card 回到已加入但未 READY、主状态回到 `0 / 4 READY`；同时通过 MQTT 广播 `round-reset`（带新 currentStage）：Environment 手机自动进入 YOUR TURN 并重启 Blow 选择器，其余手机自动显示 WAITING FOR ENVIRONMENT，无需退出或刷新。
 
 > 联机要求：笔记本和手机都要能上网（消息经公共 MQTT 服务器中转）。房间码保存在本地，下次打开还会沿用同一个码。
 
