@@ -1,17 +1,20 @@
 /* DECIDER - Shared Main Screen logic
  *
- * Listens for messages from the phone player tabs and renders:
- *  - the five role cards at the bottom
- *  - the shared world in the middle (with action effects)
- *  - the latest action / combined result text
+ * Listens for messages from the phones in the room:
+ *  - player-join / player-leave / player-heartbeat: role card state
+ *  - player-result: stores the submitted result PER ROLE (secret -
+ *    never shown) and marks that role READY. No environment /
+ *    character / item feedback is triggered yet.
+ * The main status shows how many roles are READY, e.g. "2 / 5 READY".
+ * Works with any number of players (1-2 phones are enough to test).
  */
 
 var OFFLINE_AFTER_MS = 4000;
 
 var state = {
   players: new Map(),   /* id -> { id, name, roleId, lastSeen } */
+  results: new Map(),   /* roleId -> result (stored secretly, not shown) */
   events: [],           /* recent log lines, newest first */
-  actedRoles: new Set(),/* role ids that have used an action since screen load */
 };
 
 var world = document.getElementById("world");
@@ -70,20 +73,17 @@ function handleMessage(msg) {
       }
       break;
 
-    case "player-action": {
-      var p = state.players.get(msg.playerId);
-      if (!p) break;
-      p.lastSeen = Date.now();
-
-      var action = actionById(msg.actionId);
-      var role = roleById(p.roleId);
-      if (!action || !role) break;
-
-      state.actedRoles.add(p.roleId);
-      applyActionFx(action.id);
-      setResult(esc(p.name) + " · " + role.name + " — " + action.icon + " " + action.name, role.color);
-      pushEvent(role.icon + " " + esc(p.name) + " used " + action.name);
-      maybeCombined();
+    /* a phone finished its interaction and submitted its result.
+     * Store it per role (secret), mark the role READY. Do NOT show
+     * the result itself and do NOT trigger any game feedback yet. */
+    case "player-result": {
+      var rp = state.players.get(msg.playerId);
+      if (!rp) break;
+      if (rp.roleId !== msg.roleId || !msg.result) break; /* sanity */
+      rp.lastSeen = Date.now();
+      state.results.set(msg.roleId, msg.result);
+      var rrole = roleById(msg.roleId);
+      pushEvent((rrole ? rrole.icon + " " : "") + esc(rp.name) + " is ready");
       break;
     }
 
@@ -106,20 +106,7 @@ function handleMessage(msg) {
   render();
 }
 
-/* ---------- visuals ---------- */
-
-function applyActionFx(actionId) {
-  var fxMap = { blow: "fx-blow", shake: "fx-shake", press: "fx-press", tilt: "fx-tilt" };
-  var cls = fxMap[actionId] || "fx-press";
-  world.classList.remove("fx-blow", "fx-shake", "fx-press", "fx-tilt");
-  void world.offsetWidth; /* restart CSS animation */
-  world.classList.add(cls);
-}
-
-function setResult(text, color) {
-  resultText.textContent = text;
-  resultText.style.color = color || "var(--text)";
-}
+/* ---------- log ---------- */
 
 function pushEvent(text) {
   state.events.unshift(text);
@@ -127,18 +114,11 @@ function pushEvent(text) {
   eventLogText.textContent = state.events.join("   ·   ");
 }
 
-function maybeCombined() {
-  if (state.actedRoles.size === DECIDER.ROLES.length) {
-    setResult("✨ All five forces combined — the world moves! ✨", "#ffffff");
-    pushEvent("⭐ All five roles have acted!");
-  }
-}
-
 /* ---------- rendering ---------- */
 
 function render() {
   renderPlayers();
-  renderResultSub();
+  renderStatus();
 }
 
 function renderPlayers() {
@@ -153,17 +133,20 @@ function renderPlayers() {
     });
 
     var online = player && (now - player.lastSeen < OFFLINE_AFTER_MS);
+    var ready = state.results.has(role.id);
 
     var card = document.createElement("div");
     card.className = "player-card";
     card.style.setProperty("--role-color", role.color);
-    if (player && online) card.classList.add("joined");
-    if (player && !online) card.classList.add("offline");
+    if (ready) card.classList.add("ready");
+    else if (player && online) card.classList.add("joined");
+    else if (player && !online) card.classList.add("offline");
 
     var status;
-    if (!player) status = '<span class="player-status status-empty">empty</span>';
-    else if (online) status = '<span class="player-status status-joined">● online</span>';
-    else status = '<span class="player-status status-offline">● offline</span>';
+    if (ready) status = '<span class="player-status status-ready">● READY</span>';
+    else if (player && online) status = '<span class="player-status status-joined">● online</span>';
+    else if (player && !online) status = '<span class="player-status status-offline">● offline</span>';
+    else status = '<span class="player-status status-empty">WAITING</span>';
 
     card.innerHTML =
       '<div class="player-icon">' + role.icon + '</div>' +
@@ -177,25 +160,20 @@ function renderPlayers() {
   });
 }
 
-function renderResultSub() {
+/* main status: current READY count, e.g. "2 / 5 READY" */
+function renderStatus() {
   var now = Date.now();
   var online = 0;
   state.players.forEach(function (p) {
     if (now - p.lastSeen < OFFLINE_AFTER_MS) online++;
   });
-  resultSub.textContent =
-    "Roles active: " + state.actedRoles.size + " / " + DECIDER.ROLES.length +
-    "  ·  Players online: " + online;
+  resultText.textContent = state.results.size + " / " + DECIDER.ROLES.length + " READY";
+  resultSub.textContent = "Players online: " + online + " · Submitted results are hidden";
 }
 
 /* mark stale players offline */
 setInterval(function () {
-  var now = Date.now();
-  var changed = false;
-  state.players.forEach(function (p) {
-    if (now - p.lastSeen >= OFFLINE_AFTER_MS) changed = true;
-  });
-  if (changed) render();
+  render();
 }, 1000);
 
 render();

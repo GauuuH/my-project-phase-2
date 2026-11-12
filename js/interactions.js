@@ -39,6 +39,8 @@ var interResetBtn = document.getElementById("interResetBtn");
 
 var interCurrent = null;
 var interLocked = false;
+var interSubmitted = false; /* own-role result was sent to the room */
+var lastResult = null;      /* { roleId, result } of the latest completion */
 
 /* per-detector state */
 var blowState = { stream: null, ctx: null, raf: null, aboveSince: 0, belowSince: 0, done: false };
@@ -80,33 +82,71 @@ function randomResult(roleId) {
 }
 
 /* Called by every detector when its interaction is detected.
- * Generates a random game result for the bound role, shows it and
- * locks the interaction until "Try again" is pressed. */
+ * Generates a random game result for the bound role and shows it.
+ * If the interaction belongs to the player's own joined role, the
+ * result is sent to the room once (player-result message) and the
+ * phone goes READY - no resubmission this round. Manual tests of
+ * other roles' interactions only show the result on the phone. */
 function interComplete() {
   if (interLocked || !interCurrent) return;
 
   var roleId = roleForInteraction(interCurrent);
   var role = roleById(roleId);
   var result = randomResult(roleId);
+  lastResult = { roleId: roleId, result: result };
 
   interSetResult(
     '<span class="result-big">' + esc(result) + '</span>' +
     '<span class="result-context">' + role.icon + " " + role.name + " · " +
     esc(getInteractionLabel(interCurrent)) + '</span>'
   );
-  interSetStatus("completed", "Completed · locked");
+  interSetStatus("completed", "Completed");
   interLocked = true;
   interResetBtn.hidden = false;
+  interSubmitted = false;
+
+  if (getJoinedRoleId() === roleId) {
+    submitResult();
+  } else {
+    interSetStatus("completed", "Completed · manual test");
+  }
 
   console.log("[Result] " + role.name + " -> " + result);
 }
 
-/* unlock after a result: clear it and re-arm the detector */
+/* send the current result to the room (once) */
+function submitResult() {
+  if (!lastResult) return;
+  var ok = typeof sendPlayerResult === "function"
+    ? sendPlayerResult(lastResult.roleId, lastResult.result)
+    : false;
+  if (ok) {
+    interSubmitted = true;
+    interSetStatus("ready", "READY — result sent");
+    interResetBtn.hidden = true; /* no resubmission this round */
+  } else {
+    interSetStatus("error", "Not sent — check connection");
+    interResetBtn.hidden = false; /* can retry the same result */
+  }
+}
+
+/* "Try again":
+ * - own-role result that failed to send -> retry the SAME result
+ * - manual test -> clear and re-arm for a new random result */
 function resetInteraction() {
+  if (interSubmitted) return;
+
+  var currentRole = interCurrent ? roleForInteraction(interCurrent) : null;
+  if (lastResult && currentRole === getJoinedRoleId()) {
+    submitResult();
+    return;
+  }
+
   interLocked = false;
   interSetResult("");
   interSetStatus("ready", "Ready");
   interResetBtn.hidden = true;
+  lastResult = null;
   blowState.done = false;
   shakeState.armed = true;
   tiltState.armed = true;
@@ -132,6 +172,8 @@ function selectInteraction(id) {
 function stopAllInteractions() {
   interCurrent = null;
   interLocked = false;
+  interSubmitted = false;
+  lastResult = null;
   interResetBtn.hidden = true;
 
   /* blow: release the microphone */

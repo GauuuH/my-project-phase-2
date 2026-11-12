@@ -26,6 +26,7 @@ var joined = false;
 var heartbeat = null;
 var playerId = getPlayerId();
 var channel = null;
+var connState = null; /* "connected" | "disconnected" | "failed" */
 
 /* Prefill the room code: ?room=XXXX in the URL first, then the last used code. */
 (function () {
@@ -141,6 +142,7 @@ function setYouStatus(cls, text) {
 }
 
 function updateConnStatus(status) {
+  connState = status;
   if (status === "connected") {
     setYouStatus("ok", "● Connected to room " + normalizeRoomCode(roomInput.value));
   } else if (status === "failed") {
@@ -148,6 +150,25 @@ function updateConnStatus(status) {
   } else {
     setYouStatus("warn", "● Reconnecting…");
   }
+}
+
+/* ---------- result submission (hook used by interactions.js) ---------- */
+
+function getJoinedRoleId() {
+  return joined ? selectedRoleId : null;
+}
+
+/* Send this role's result to the room once.
+ * Returns true when the room connection is up. */
+function sendPlayerResult(roleId, result) {
+  if (!joined || !channel || connState !== "connected") return false;
+  channel.send({
+    type: "player-result",
+    playerId: playerId,
+    roleId: roleId,
+    result: result,
+  });
+  return true;
 }
 
 /* ---------- messages from the screen ---------- */

@@ -439,6 +439,11 @@ body {
   opacity: 0.45;
 }
 
+.player-card.ready {
+  border-color: #3ddc84;
+  box-shadow: 0 0 14px -8px #3ddc84;
+}
+
 .player-icon {
   font-size: 26px;
 }
@@ -466,5 +471,6 @@ body {
 }
 
 .status-joined { color: #3ddc84; }
+.status-ready { color: #3ddc84; }
 .status-offline { color: #f87171; }
 .status-empty { color: var(--muted); }
