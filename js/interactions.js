@@ -23,7 +23,7 @@
  */
 
 var INTER_CONFIG = {
-  blow:  { threshold: 0.06, holdMs: 260, releaseMs: 400 },
+  blow:  { threshold: 0.025, holdMs: 150, releaseMs: 400 },
   shake: { threshold: 22, cooldownMs: 1200, calmMs: 8 },
   press: { holdMs: 1500 },
   tilt:  { triggerDeg: 32, resetDeg: 15, cooldownMs: 1000 },
